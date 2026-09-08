@@ -113,7 +113,9 @@ export default class Crunchy implements ServiceClass {
 			await this.doSearch({ ...argv, search: argv.search as string });
 		} else if (argv.series && argv.series.match(/^[0-9A-Z]{9,}$/)) {
 			await this.refreshToken();
-			await this.logSeriesById(argv.series as string);
+			// --srz alone lists the seasons; once -s narrows it down the season list
+			// is just noise, so only the episode list is shown.
+			if (!argv.s) await this.logSeriesById(argv.series as string);
 			const selected = await this.downloadFromSeriesID(argv.series, { ...argv });
 			if (selected.isOk) {
 				for (const select of selected.value) {
@@ -480,7 +482,7 @@ export default class Crunchy implements ServiceClass {
 		}
 		const profile = await profileReq.res.json();
 		if (!silent) {
-			console.info('USER: %s (%s)', profile.username, profile.email);
+			console.info('USER: %s', profile.username);
 		}
 		return true;
 	}
@@ -600,7 +602,7 @@ export default class Crunchy implements ServiceClass {
 		}
 		if (this.token.refresh_token) {
 			await this.getProfile(silent);
-		} else {
+		} else if (!silent) {
 			console.info('USER: Anonymous');
 		}
 		await this.getCMStoken(ifNeeded);
@@ -3347,18 +3349,22 @@ export default class Crunchy implements ServiceClass {
 			normal = Object.entries(episodes).filter((a) => a[0].startsWith('E')),
 			sortedEpisodes = Object.fromEntries([...normal, ...specials]);
 
-		for (const key of Object.keys(sortedEpisodes)) {
+		// Listing rules: `--srz` shows seasons, `--srz -s` shows episodes, and once
+		// `-e` picks an episode neither listing is useful.
+		const listingArgv = yargs.appArgv(this.cfg.cli);
+		const showEpisodeList = Boolean(listingArgv.s) && !listingArgv.e;
+		for (const key of Object.keys(showEpisodeList ? sortedEpisodes : {})) {
 			const item = sortedEpisodes[key];
 			const epNum = key.startsWith('E') ? `E${data?.absolute ? item.items[0].episode_number?.toString() || item.items[0].episode : key.slice(1)}` : key;
 			console.info(`[${data?.absolute ? epNum : key}] [${item.items[0].upload_date ? new Date(item.items[0].upload_date).toISOString().slice(0, 10) : '0000-00-00'}] ${
 				item.items.find((a) => !a.season_title.match(/\(\w+ Dub\)/))?.season_title ?? item.items[0].season_title.replace(/\(\w+ Dub\)/g, '').trimEnd()
 			} - Season ${item.items[0].season_number} - ${item.items[0].title}
-            \r\t- Versions: ${item.items
+   - Versions: ${item.items
 				.map((a, index) => {
 					return `${a.is_premium_only ? '☆ ' : ''}${item.langs?.[index]?.name ?? 'Unknown'}`;
 				})
 				.join(', ')}
-            \r\t- Subtitles: ${[...new Set(item.items.flatMap((a) => a.subtitle_locales ?? 'None'))].join(', ')}`);
+   - Subtitles: ${[...new Set(item.items.flatMap((a) => a.subtitle_locales ?? 'None'))].join(', ')}`);
 		}
 
 		if (!serieshasversions) {
@@ -3402,9 +3408,12 @@ export default class Crunchy implements ServiceClass {
 
 	public async downloadFromSeriesID(id: string, data: CrunchyMultiDownload): Promise<ResponseBase<CrunchyEpMeta[]>> {
 		const { data: episodes } = await this.listSeriesID(id, data);
-		console.info('');
-		console.info('-'.repeat(30));
-		console.info('');
+		const sepArgv = yargs.appArgv(this.cfg.cli);
+		if (sepArgv.s && !sepArgv.e) {
+			console.info('');
+			console.info('-'.repeat(30));
+			console.info('');
+		}
 		const selected = this.itemSelectMultiDub(episodes, data.dubLang, data.but, data.all, data.e, data.absolute);
 		for (const key of Object.keys(selected)) {
 			const item = selected[key];
