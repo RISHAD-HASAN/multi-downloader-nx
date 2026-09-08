@@ -18,10 +18,7 @@ const SERVICES: Record<string, any> = {
 	adn: ADN
 };
 
-/**
- * Resolve `-u/--url` into a service + target argument.
- * Ported from the Yurasubs fork (modules/module.url.ts).
- */
+// -u/--url: work out the service and which id to set from the URL.
 const applyUrl = (argv: any): boolean => {
 	if (!argv.url) return true;
 	const parsed = parseUrl(argv.url);
@@ -59,7 +56,7 @@ const applyUrl = (argv: any): boolean => {
 	const cfg = yamlCfg.loadCfg();
 	const argv = appArgv(cfg.cli);
 
-	// Console presentation (ported from unshackle): palette + colour toggle
+	// palette / colour
 	if (argv.noColor) theme.enabled = false;
 	else if (argv.theme) setTheme(argv.theme);
 
@@ -68,7 +65,7 @@ const applyUrl = (argv: any): boolean => {
 
 	if (argv.debug) console.level = 'debug';
 
-	// Content key vaults (ported from unshackle) - see config/vaults.yml
+	// key vaults, see config/vaults.yml
 	const vaultCfg = yamlCfg.loadVaultCfg();
 	configureVaults(vaultCfg.key_vaults, yamlCfg.workingDir, vaultCfg.enabled !== false);
 
