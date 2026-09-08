@@ -90,6 +90,20 @@ const patchGlobalConsole = () => {
 };
 patchGlobalConsole();
 
+// node:sqlite (used by the SQLite key vault) emits an ExperimentalWarning on
+// every run; it is expected and would otherwise surface as an ERROR line.
+// Node prints warnings from its own default listener, so it has to be replaced.
+const defaultWarningListeners = process.listeners('warning');
+process.removeAllListeners('warning');
+process.on('warning', (w) => {
+	if (w.name === 'ExperimentalWarning' && /SQLite/i.test(w.message)) return;
+	if (defaultWarningListeners.length) {
+		for (const l of defaultWarningListeners) l(w);
+		return;
+	}
+	rich.warn(`${w.name}: ${w.message}`);
+});
+
 /**
  * Backwards-compatible logger object. `console.info(...)` etc. behave exactly
  * as before from a caller's point of view, but now render with markup support.

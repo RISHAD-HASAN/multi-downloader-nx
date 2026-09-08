@@ -52,6 +52,16 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		usage: ''
 	},
 	{
+		name: 'url',
+		alias: 'u',
+		describe: 'Set the URL to download from (automatically selects service and target ID)',
+		docDescribe: 'Provide a series, season, or episode URL from Crunchyroll, HiDive, or ADN.' + '\nThe service and target IDs are automatically resolved.',
+		group: 'dl',
+		service: ['all'],
+		type: 'string',
+		usage: '${url}'
+	},
+	{
 		name: 'auth',
 		describe: 'Enter authentication mode',
 		type: 'boolean',
@@ -222,6 +232,46 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		usage: '${qualityLevel}'
 	},
 	{
+		name: 'theme',
+		group: 'util',
+		describe: 'Colour theme for the CLI output',
+		docDescribe:
+			'Colour palette used by the console renderer (ported from unshackle).' +
+			'\nAvailable: catppuccin-mocha, dracula, nord, gruvbox, one-dark, mono.',
+		service: ['all'],
+		type: 'string',
+		choices: ['catppuccin-mocha', 'dracula', 'nord', 'gruvbox', 'one-dark', 'mono'],
+		default: {
+			default: 'catppuccin-mocha'
+		},
+		usage: '${theme}'
+	},
+	{
+		name: 'noColor',
+		group: 'util',
+		describe: 'Disable all colour and styling in the console output',
+		docDescribe: true,
+		service: ['all'],
+		type: 'boolean',
+		usage: '',
+		default: {
+			default: false
+		}
+	},
+	{
+		name: 'list-formats',
+		alias: 'F',
+		describe: 'List all available video and audio formats/qualities and exit without downloading',
+		docDescribe: 'List all available video and audio formats/qualities with their resolution, bitrate, and codec, then exit without downloading.',
+		group: 'dl',
+		service: ['all'],
+		type: 'boolean',
+		usage: '',
+		default: {
+			default: false
+		}
+	},
+	{
 		name: 'dlVideoOnce',
 		describe: 'Download only once the video with the best selected quality',
 		type: 'boolean',
@@ -327,6 +377,18 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		},
 		docDescribe: true,
 		usage: '${device}'
+	},
+	{
+		name: 'majin',
+		group: 'dl',
+		describe: 'Enable Majin quality mode which transforms stream URLs for higher quality CENC DASH streams.',
+		docDescribe: true,
+		service: ['crunchy'],
+		type: 'boolean',
+		usage: '',
+		default: {
+			default: false
+		}
 	},
 	{
 		name: 'tsd',

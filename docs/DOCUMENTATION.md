@@ -557,3 +557,53 @@ Proxies everything, not recommended. Proxy needs to be defined.
 
 Show the help output
 ### GUI
+
+---
+
+## Content Key Vaults
+
+*Ported from [unshackle](https://github.com/unshackle-dl/unshackle).*
+
+A vault caches `KID -> CONTENT KEY` pairs per service. When a title is
+re-downloaded — or when another dub/season shares the same keys — aniDL reads
+the key straight from the vault and never contacts the licence server.
+
+Configure in `config/vaults.yml`:
+
+```yaml
+enabled: true
+key_vaults:
+  - type: SQLite            # requires Node >= 22.5 (built-in node:sqlite)
+    name: 'Local Vault'
+    path: './config/key_vault.db'
+
+  # - type: JSON            # zero-dependency fallback for older Node
+  #   name: 'Local JSON Vault'
+  #   path: './config/key_vault.json'
+
+  # - type: API             # remote HTTP vault (unshackle API protocol)
+  #   name: 'Team Vault'
+  #   uri: 'https://vault.example.com/api'
+  #   token: 'your-secret-key'
+  #   no_push: false        # true = read-only
+```
+
+Local vaults are always queried before network vaults. Keys obtained from a
+licence are written back to every vault that does not set `no_push: true`.
+
+The SQLite schema is compatible with unshackle/devine vaults, so you can point
+`path` at an existing `key_vault.db`.
+
+## Console Theming
+
+*Ported from [unshackle](https://github.com/unshackle-dl/unshackle).*
+
+| Option | Description |
+| ------ | ----------- |
+| `--theme <name>` | `catppuccin-mocha` (default), `dracula`, `nord`, `gruvbox`, `one-dark`, `mono` |
+| `--noColor` | Disable all colour and styling |
+
+Environment overrides: `ANIDL_THEME`, `ANIDL_NO_COLOR`, `ANIDL_LOG_LEVEL`
+(`debug`/`info`/`warning`/`error`).
+
+See `cli-preview.html` for a rendered sample of every palette.

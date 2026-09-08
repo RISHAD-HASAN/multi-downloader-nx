@@ -102,6 +102,16 @@ export let argvC: {
 	proxyAll: boolean;
   //handling signs subtitles
 	signSubsForced: 'yes' | 'default' | 'no';
+	// URL auto-detection (fork: Yurasubs)
+	url: string | undefined;
+	// List every available video/audio format and exit (fork: Yurasubs)
+	'list-formats': boolean;
+	listFormats: boolean;
+	// Crunchyroll high-bitrate CENC DASH streams (fork: Yurasubs)
+	majin: boolean;
+	// Console presentation (ported from unshackle)
+	theme: string;
+	noColor: boolean;
 };
 
 export type ArgvType = typeof argvC;

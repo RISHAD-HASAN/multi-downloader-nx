@@ -86,6 +86,8 @@
 		"start": "pnpm prestart && cd lib && node gui.js",
 		"gui": "cd ./gui/react/ && pnpm start",
 		"docs": "tsx modules/build-docs.ts",
+		"test:vault": "tsx tests/vault.test.ts",
+		"preview:cli": "tsx scripts/render-cli-preview.ts",
 		"tsc": "tsx tsc.ts",
 		"eslint": "npx eslint . --quiet",
 		"prettier": "npx prettier . --check",

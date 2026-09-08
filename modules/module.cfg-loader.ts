@@ -7,16 +7,7 @@ import { console } from './log';
 import { GuiState } from '../@types/messageHandler';
 import type { VaultConfig } from './module.vault';
 
-// new-cfg
-const workingDir = (
-	process as NodeJS.Process & {
-		pkg?: unknown;
-	}
-).pkg
-	? path.dirname(process.execPath)
-	: process.env.contentDirectory
-		? process.env.contentDirectory
-		: path.join(__dirname, '/..');
+import { workingDir } from './module.working-dir';
 
 export { workingDir };
 
@@ -97,6 +88,52 @@ export type ConfigObject = {
 	gui: GUIConfig;
 };
 
+/**
+ * Case-insensitive environment lookup (Windows env vars are case-insensitive).
+ * Ported from the Yurasubs fork.
+ */
+export const getEnv = (name: string): string | undefined => {
+	if (process.env[name] !== undefined) return process.env[name];
+	const upper = name.toUpperCase();
+	for (const key of Object.keys(process.env)) {
+		if (key.toUpperCase() === upper) return process.env[key];
+	}
+	return undefined;
+};
+
+/**
+ * Expand environment variables and `~` inside a config value, so bin-path.yml
+ * can use %FFMPEG_PATH%, ${FFMPEG_PATH}, $FFMPEG_PATH or ~/bin on any platform.
+ * Ported from the Yurasubs fork.
+ */
+export const resolveEnv = (str: string): string => {
+	if (!str || typeof str !== 'string') return str;
+	// Windows %VAR% syntax
+	let result = str.replace(/%([^%]+)%/g, (match, n) => {
+		const val = getEnv(n);
+		return val !== undefined ? val : match;
+	});
+	// Unix ${VAR} syntax
+	result = result.replace(/\${([a-zA-Z0-9_]+)}/g, (match, n) => {
+		const val = getEnv(n);
+		return val !== undefined ? val : match;
+	});
+	// Unix $VAR syntax
+	result = result.replace(/(?<!\\)\$([a-zA-Z0-9_]+)/g, (match, n) => {
+		const val = getEnv(n);
+		return val !== undefined ? val : match;
+	});
+	// Home directory expansion
+	if (result.startsWith('~/') || result.startsWith('~\\')) {
+		const home = getEnv('HOME') || getEnv('USERPROFILE') || '';
+		if (home) result = path.join(home, result.slice(2));
+	} else if (result === '~') {
+		const home = getEnv('HOME') || getEnv('USERPROFILE') || '';
+		if (home) result = home;
+	}
+	return result;
+};
+
 const loadCfg = (): ConfigObject => {
 	// load cfgs
 	const defaultCfg: ConfigObject = {
@@ -160,6 +197,8 @@ const loadBinCfg = async () => {
 		if (!Object.prototype.hasOwnProperty.call(binCfg, dir) || typeof binCfg[dir] != 'string') {
 			binCfg[dir] = defaultBin[dir];
 		}
+		// Expand %VAR% / ${VAR} / $VAR / ~ before any path resolution (fork: Yurasubs)
+		binCfg[dir] = resolveEnv(binCfg[dir] as string);
 		if ((binCfg[dir] as string).match(/^\${wdir}/)) {
 			binCfg[dir] = (binCfg[dir] as string).replace(/^\${wdir}/, '');
 			binCfg[dir] = path.join(workingDir, binCfg[dir] as string);
@@ -384,6 +423,8 @@ export {
 	getState,
 	setState,
 	writeYamlCfgFile,
+	loadVaultCfg,
+	vaultCfgFile,
 	sessCfgFile,
 	hdPflCfgFile,
 	cfgDir
