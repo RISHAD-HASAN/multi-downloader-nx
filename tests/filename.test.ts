@@ -1,8 +1,6 @@
-/**
- * Scene-style filename rules: whitespace and punctuation collapse into dots.
- * The real-world case is the Windows full-width colon (U+FF1A) that appeared as
- * "Mushoku.Tensei：.Jobless..." in a live download.
- */
+// Scene-style filename rules: whitespace and punctuation collapse into dots.
+// The real-world case is the Windows full-width colon (U+FF1A) that appeared as
+// "Mushoku.Tensei：.Jobless..." in a live download.
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
@@ -25,7 +23,7 @@ const cases: Array<[string, string]> = [
 	['[Crunchyroll] Show (2026)', 'Crunchyroll.Show.2026'],
 	['Turning   Point    4', 'Turning.Point.4'],
 	['Re:Zero - Starting Life', 'Re.Zero.Starting.Life'],
-	['S03E09 — Lament!', 'S03E09.Lament']
+	['S03E09 - Lament!', 'S03E09.Lament']
 ];
 
 for (const [input, expected] of cases) {

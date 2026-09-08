@@ -23,7 +23,7 @@ export type Params = {
 
 type CustomParams = {
 	useProxy: boolean;
-	/** Suppress console output; the caller reports the failure itself. */
+	// Suppress console output; the caller reports the failure itself
 	silent: boolean;
 };
 

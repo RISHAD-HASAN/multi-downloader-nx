@@ -288,7 +288,7 @@ class Merger {
 		}
 
 		if (this.options.subtitles.length > 0) {
-			// Sort subtitles: normal → signs → CC
+			// Sort subtitles: normal -> signs -> CC
 			const sortedSubs = [...this.options.subtitles].sort((a, b) => {
 				const getPriority = (s: any) => {
 					if (s.closedCaption) return 2; // CC last

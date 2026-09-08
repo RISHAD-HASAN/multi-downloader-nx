@@ -1,16 +1,8 @@
-/**
- * module.download-ui.ts — the live, unshackle-style download view.
- *
- * Owns a single active "download session": a Tree of tracks grouped by type,
- * each with its own spinner, gradient bar, ETA and transferred/speed readout,
- * repainted in place by a Live region.
- *
- * `hls-download.ts` reports progress here instead of printing a line per chunk;
- * ordinary log lines still print above the live region.
- *
- * Origin: unshackle's `Tracks.tree(add_progress=True)` + the `SyncLive`
- * download table in unshackle/commands/dl.py.
- */
+// The live download view.
+//
+// Holds one session per episode. hls-download reports into it instead of
+// printing a line per chunk, and extra dubs/subtitles get appended to the same
+// tree as they show up. Normal log lines still print above the live region.
 
 import { console_ } from './module.console';
 import { DownloadTable, formatBytes, type TrackLike } from './module.console';
@@ -18,13 +10,13 @@ import { DownloadTable, formatBytes, type TrackLike } from './module.console';
 export type UITrackType = 'Video' | 'Audio' | 'Subtitle';
 
 export interface UITrack {
-	/** Stable identifier used by the downloader to address this row. */
+	// Stable identifier used by the downloader to address this row
 	key: string;
 	type: UITrackType;
 	label: string;
 }
 
-/** Terminal states shown in place of the transferred amount. */
+// Terminal states shown in place of the transferred amount
 export type TrackState = 'Downloaded' | 'Decrypting' | 'Decrypted' | 'Muxing' | 'Muxed' | 'SKIPPED' | 'FAILED';
 
 interface TrackRuntime {
@@ -68,7 +60,7 @@ class DownloadSession {
 		return this.runtime.has(key);
 	}
 
-	/** Register a track once the view is already on screen. */
+	// Register a track once the view is already on screen
 	add(track: UITrack) {
 		if (this.runtime.has(track.key)) return;
 		this.tracks.push(track);
@@ -84,7 +76,7 @@ class DownloadSession {
 		this.table.addTrack({ key: track.key, type: track.type, label: track.label });
 	}
 
-	/** Report progress for one track. Safe to call very frequently. */
+	// Report progress for one track. Safe to call very frequently
 	progress(key: string, patch: { completed?: number; total?: number | null; bytes?: number }) {
 		const rt = this.runtime.get(key);
 		if (!rt || this.stopped) return;
@@ -118,7 +110,7 @@ class DownloadSession {
 		return size;
 	}
 
-	/** Mark a track as finished/decrypted/muxed/skipped. */
+	// Mark a track as finished/decrypted/muxed/skipped
 	state(key: string, state: TrackState) {
 		const rt = this.runtime.get(key);
 		if (!rt || this.stopped) return;
@@ -166,7 +158,7 @@ export function sessionActive(): boolean {
 	return current !== undefined;
 }
 
-/** True when the live view owns this track (so the caller should not log lines). */
+// True when the live view owns this track (so the caller should not log lines).
 export function sessionOwns(key?: string): boolean {
 	return Boolean(current && key && current.has(key));
 }
@@ -179,12 +171,12 @@ export function trackState(key: string, state: TrackState): void {
 	current?.state(key, state);
 }
 
-/** Add a track to the running session (2nd dub, subtitles, ...). */
+// Add a track to the running session (2nd dub, subtitles, ...)
 export function addTrack(track: UITrack): void {
 	current?.add(track);
 }
 
-/** Mark every track still in flight with a terminal state. */
+// Mark every track still in flight with a terminal state
 export function trackStateAll(state: TrackState, only?: UITrackType): void {
 	if (!current) return;
 	for (const t of current.tracks) {
@@ -198,7 +190,7 @@ export function endSession(): void {
 	current = undefined;
 }
 
-/** Guarantees the live region is torn down even if the body throws. */
+// Guarantees the live region is torn down even if the body throws
 export async function withSession<T>(tracks: UITrack[], fn: () => Promise<T>): Promise<T> {
 	beginSession(tracks);
 	try {

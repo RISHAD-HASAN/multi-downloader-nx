@@ -1,11 +1,8 @@
-/**
- * Guards the packaged-build config manifest.
- *
- * `modules/build.ts` copies config files into the build output one by one.
- * When `config/vaults.yml` was added it was not included, so packaged binaries
- * silently shipped without key vaults. This test fails if any shipped config
- * file in `config/` is missing from build.ts's copy list.
- */
+// Guards the packaged-build config manifest.
+// `modules/build.ts` copies config files into the build output one by one.
+// When `config/vaults.yml` was added it was not included, so packaged binaries
+// silently shipped without key vaults. This test fails if any shipped config
+// file in `config/` is missing from build.ts's copy list.
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';

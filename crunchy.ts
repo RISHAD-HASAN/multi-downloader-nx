@@ -1538,16 +1538,12 @@ export default class Crunchy implements ServiceClass {
 		}
 	}
 
-	/**
-	 * Rewrite a Crunchyroll playback URL to its "majin" variant - a separate,
-	 * higher-bitrate CENC-encrypted DASH encode.
-	 * Ported from the Yurasubs fork.
-	 */
+	// Rewrite a playback URL to the majin variant: a separate, higher bitrate
+	// CENC encode that some titles have and some don't.
 	private applyMajinTransform(url: string): string {
-		// Already a majin URL - never rewrite twice (/static/majin/majin/...)
+		// don't double-apply, that gives /static/majin/majin/...
 		if (url.includes('/static/majin/')) return url;
-		// Only DASH playback URLs have a majin/CENC counterpart; leave HLS and
-		// anything unrecognised untouched rather than producing a dead URL.
+		// only DASH has a majin counterpart, leave HLS alone or we build a dead URL
 		if (!/\/(?:\d+\/)?clean\/dash\//.test(url) || !url.includes('/static/')) return url;
 		return url.replace('/static/', '/static/majin/').replace(/\/(?:\d+\/)?clean\/dash\//, '/clean/cenc/dash/');
 	}
@@ -2223,7 +2219,7 @@ export default class Crunchy implements ServiceClass {
 						const chosenVideoSegments = videos[chosenVideoQuality];
 						const chosenAudioSegments = audios[chosenAudioQuality];
 
-						// unshackle-style available-track tree, grouped by track type
+						// available tracks, grouped by type
 						const availTree = tracksTree([
 							...videos.map((a, ind) => ({ type: 'Video' as const, label: `[repr.number]${ind + 1}[/] ${a.resolutionText}` })),
 							...audios.map((a, ind) => ({ type: 'Audio' as const, label: `[repr.number]${ind + 1}[/] ${a.resolutionText}` }))
@@ -3102,7 +3098,7 @@ export default class Crunchy implements ServiceClass {
 											sBody = newLines.join('\n');
 										}
 
-										// Force outline thickness for ru-RU: if the 17th field (Outline) equals 2.6 → 2
+										// Force outline thickness for ru-RU: if the 17th field (Outline) equals 2.6 -> 2
 										if (langItem.cr_locale === 'ru-RU') {
 											sBody = sBody.replace(/^[ \t]*(Style:\s*[^,\n]*(?:,[^,\n]*){15}),\s*2(?:[.,]6(?:0+)?)?(\s*,)/gm, '$1,2$2');
 										}

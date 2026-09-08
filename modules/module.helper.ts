@@ -5,7 +5,7 @@ import childProcess from 'child_process';
 import { console_ as richConsole } from './module.console';
 import { console } from './log';
 
-/** Subprocess output is hidden unless the user asked for --debug. */
+// Subprocess output is hidden unless the user asked for --debug
 const quietDefault = () => richConsole.level !== 'debug' && process.env.isGUI !== 'true';
 
 export default class Helper {

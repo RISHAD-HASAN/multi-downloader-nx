@@ -1,10 +1,7 @@
-/**
- * Regression tests for the console renderer.
- *
- * The rich console replaced log4js, so it must preserve `util.format`
- * substitution (`%s`, `%d`, …) used by ~29 existing call sites, plus markup,
- * wrapping and colour-disabling behaviour.
- */
+// Regression tests for the console renderer.
+// The rich console replaced log4js, so it must preserve `util.format`
+// substitution (`%s`, `%d`, …) used by ~29 existing call sites, plus markup,
+// wrapping and colour-disabling behaviour.
 import assert from 'assert';
 import { RichConsole, Text, Tree, Padding, Table, stripAnsi, stripMarkup, renderMarkup, setTheme, theme, textWidth } from '../modules/module.rich';
 

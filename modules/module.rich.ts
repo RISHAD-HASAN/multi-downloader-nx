@@ -1,20 +1,12 @@
-/**
- * module.rich.ts — a dependency-free re-implementation of the parts of Python's
- * `rich` library that unshackle relies on for its console presentation.
- *
- * Ported for multi-downloader-nx so the CLI can render unshackle-style output:
- * themed palettes, markup, rules, panels, trees, grids, gradient progress bars
- * and in-place `Live` regions.
- *
- * Origin: concepts from https://github.com/unshackle-dl/unshackle
- *   (unshackle/core/console.py, unshackle/core/themes.py)
- */
+// Small reimplementation of the parts of Python's rich that the console layer
+// needs: themes, markup, panels/trees/tables, progress bars and a Live region.
+// Deliberately dependency free. The Node ports either don't do the Live/refresh
+// bit properly or pull in far too much.
 
 import { format as nodeFormat, inspect as nodeInspectRaw } from 'util';
 
 const nodeInspect = (v: unknown) => nodeInspectRaw(v, { depth: 4, colors: false, breakLength: 120 });
 
-/* ────────────────────────────────────────────────────────────── palettes ── */
 
 export type Palette = Record<string, string>;
 
@@ -124,7 +116,6 @@ export function resolvePalette(name?: string): Palette | undefined {
 	return PALETTES[name.toLowerCase()];
 }
 
-/* ───────────────────────────────────────────────────────────────── colour ── */
 
 export type RGB = [number, number, number];
 
@@ -154,7 +145,6 @@ const fg = (c: RGB) => `\x1b[38;2;${c[0]};${c[1]};${c[2]}m`;
 const bgSeq = (c: RGB) => `\x1b[48;2;${c[0]};${c[1]};${c[2]}m`;
 export const RESET = '\x1b[0m';
 
-/* ──────────────────────────────────────────────────────────────── styling ── */
 
 export interface Style {
 	color?: RGB;
@@ -182,10 +172,7 @@ export function styleToAnsi(s: Style): string {
 	return out;
 }
 
-/**
- * A theme maps semantic style names ("log.level.error", "repr.number") onto
- * concrete styles, exactly like rich's Theme + unshackle's palette roles.
- */
+// Maps style names ("log.level.error", "repr.number") onto concrete styles.
 export class Theme {
 	public palette: Palette;
 	public styles: Record<string, Style> = {};
@@ -315,7 +302,6 @@ export function setTheme(name?: string, enabled = true) {
 	return theme;
 }
 
-/* ─────────────────────────────────────────────────────────── text/markup ── */
 
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
@@ -323,7 +309,7 @@ export function stripAnsi(s: string): string {
 	return s.replace(ANSI_RE, '');
 }
 
-/** Visible width of a string, accounting for wide CJK glyphs. */
+// Visible width of a string, accounting for wide CJK glyphs
 export function textWidth(s: string): number {
 	const plain = stripAnsi(s);
 	let w = 0;
@@ -359,7 +345,7 @@ export function padTo(s: string, width: number, align: 'left' | 'right' | 'cente
 	return s + ' '.repeat(diff);
 }
 
-/** Truncate to a visible width, preserving ANSI sequences. */
+// Truncate to a visible width, preserving ANSI sequences
 export function truncateVisible(s: string, width: number, ellipsis = '…'): string {
 	if (textWidth(s) <= width) return s;
 	let out = '';
@@ -436,7 +422,7 @@ export function renderMarkup(input: string, base: Style = {}): string {
 	return out + RESET;
 }
 
-/** Remove markup tags without emitting colour (for non-TTY / log files). */
+// Remove markup tags without emitting colour (for non-TTY / log files)
 export function stripMarkup(input: string): string {
 	let out = '';
 	let i = 0;
@@ -463,12 +449,11 @@ export function stripMarkup(input: string): string {
 	return out;
 }
 
-/* ────────────────────────────────────────────────────────── renderables ── */
 
 export interface Renderable {
-	/** Render to a list of lines, each at most `width` visible columns. */
+	// Render to a list of lines, each at most `width` visible columns
 	render(width: number): string[];
-	/** Preferred (minimum sensible) width. */
+	// Preferred (minimum sensible) width
 	measure?(maxWidth: number): number;
 }
 
@@ -488,7 +473,7 @@ function measureOf(x: RenderInput, maxWidth: number): number {
 	return Math.max(0, ...r.render(maxWidth).map(textWidth));
 }
 
-/** Plain (optionally markup'd, optionally wrapped) text. */
+// Plain (optionally markup'd, optionally wrapped) text
 export class Text implements Renderable {
 	constructor(
 		public content: string,
@@ -540,7 +525,7 @@ export class Text implements Renderable {
 	}
 }
 
-/** Word-wrap a markup string to `width` visible columns, keeping tags intact. */
+// Word-wrap a markup string to `width` visible columns, keeping tags intact.
 export function wrapMarkup(src: string, width: number): string[] {
 	const tokens = src.split(/(\s+)/);
 	const lines: string[] = [];
@@ -580,7 +565,7 @@ export function wrapMarkup(src: string, width: number): string[] {
 	return lines;
 }
 
-/** Vertical stack of renderables (rich.console.Group). */
+// Vertical stack of renderables (rich.console.Group)
 export class Group implements Renderable {
 	public items: RenderInput[];
 	constructor(...items: RenderInput[]) {
@@ -602,7 +587,7 @@ function unpackPadding(p: PaddingDims): [number, number, number, number] {
 	return p;
 }
 
-/** rich.padding.Padding — the (0, 5) indent that gives unshackle its look. */
+// rich.padding.Padding - the (0, 5) indent that gives unshackle its look.
 export class Padding implements Renderable {
 	constructor(
 		public inner: RenderInput,
@@ -626,7 +611,7 @@ export class Padding implements Renderable {
 	}
 }
 
-/** rich.rule.Rule — a horizontal divider with an optional centred title. */
+// rich.rule.Rule - a horizontal divider with an optional centred title
 export class Rule implements Renderable {
 	constructor(
 		public title = '',
@@ -657,7 +642,7 @@ export const BOX = {
 	DOUBLE: { tl: '╔', tr: '╗', bl: '╚', br: '╝', h: '═', v: '║' }
 };
 
-/** rich.panel.Panel */
+// rich.panel.Panel
 export class Panel implements Renderable {
 	constructor(
 		public inner: RenderInput,
@@ -705,7 +690,7 @@ export class Panel implements Renderable {
 	}
 }
 
-/** rich.tree.Tree */
+// rich.tree.Tree
 export class Tree implements Renderable {
 	public children: Tree[] = [];
 	constructor(
@@ -753,7 +738,7 @@ export interface ColumnSpec {
 }
 
 /**
- * rich.table.Table — supports `Table.grid()` (invisible layout table, what
+ * rich.table.Table - supports `Table.grid()` (invisible layout table, what
  * unshackle uses everywhere) and bordered tables with headers.
  */
 export class Table implements Renderable {
@@ -787,7 +772,7 @@ export class Table implements Renderable {
 		return this;
 	}
 
-	/** Replace an existing row in place — used by the live download table. */
+	// Replace an existing row in place - used by the live download table
 	setRow(index: number, ...cells: RenderInput[]) {
 		this.rows[index] = cells;
 	}
@@ -893,7 +878,6 @@ export class Table implements Renderable {
 	}
 }
 
-/* ─────────────────────────────────────────────────────────────── progress ── */
 
 export interface TaskState {
 	id: number;
@@ -930,7 +914,7 @@ export function formatDuration(secs: number, compact = true): string {
 }
 
 /**
- * unshackle's GradientPulseBarColumn: a bar that blends pink→blue across the
+ * unshackle's GradientPulseBarColumn: a bar that blends pink->blue across the
  * completed portion and animates a pulse while the task total is unknown.
  */
 export class GradientBar implements Renderable {
@@ -1010,7 +994,7 @@ export type ProgressColumn =
 	| 'description'
 	| string;
 
-/** rich.progress.Progress — a set of tasks each rendered as one line. */
+// rich.progress.Progress - a set of tasks each rendered as one line
 export class Progress implements Renderable {
 	public tasks: TaskState[] = [];
 	private nextId = 0;
@@ -1137,10 +1121,9 @@ export class Progress implements Renderable {
 	}
 }
 
-/* ─────────────────────────────────────────────────────────────────── live ── */
 
 /**
- * rich.live.Live — repaints a renderable in place. Falls back to a single
+ * rich.live.Live - repaints a renderable in place. Falls back to a single
  * final render when stdout is not a TTY (CI logs, GUI mode, piped output).
  */
 export class Live {
@@ -1176,7 +1159,7 @@ export class Live {
 		if (refresh) this.refresh();
 	}
 
-	/** Erase the live region so normal output can be written above it. */
+	// Erase the live region so normal output can be written above it
 	clear() {
 		if (!this.con.isTerminal || this.lastHeight === 0) return;
 		this.con.write(`\x1b[${this.lastHeight}A`);
@@ -1208,7 +1191,7 @@ export class Live {
 		}
 	}
 
-	/** Run `fn` with the live region active, guaranteeing cleanup. */
+	// Run `fn` with the live region active, guaranteeing cleanup
 	static async with<T>(renderable: RenderInput, opts: Live['opts'], fn: (live: Live) => Promise<T>): Promise<T> {
 		const live = new Live(renderable, opts).start();
 		try {
@@ -1219,7 +1202,6 @@ export class Live {
 	}
 }
 
-/* ──────────────────────────────────────────────────────────────── console ── */
 
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 
@@ -1293,7 +1275,7 @@ export class RichConsole {
 		this.live = live;
 	}
 
-	/** Register an extra destination (e.g. the log4js file appender). */
+	// Register an extra destination (e.g. the log4js file appender)
 	addSink(fn: (level: LogLevel, text: string) => void) {
 		this.sinks.push(fn);
 	}
@@ -1310,7 +1292,7 @@ export class RichConsole {
 		if (this.isTerminal) this.stream.write('\x1b[?25h');
 	}
 
-	/** Print a renderable (or markup string) above any active Live region. */
+	// Print a renderable (or markup string) above any active Live region
 	print(renderable: RenderInput = '', opts: { justify?: 'left' | 'center' | 'right' } = {}) {
 		if (this.quiet) return;
 		const width = this.width;
@@ -1343,7 +1325,7 @@ export class RichConsole {
 		return renderMarkup(`[log.level.${level}]${padTo(label, this.levelWidth)}[/]`);
 	}
 
-	/** The core log renderer — time column, level column, padded message. */
+	// The core log renderer - time column, level column, padded message
 	writeLog(level: LogLevel, ...args: any[]) {
 		const order: LogLevel[] = ['debug', 'info', 'warning', 'error', 'critical'];
 		if (order.indexOf(level) < order.indexOf(this.level)) return;
@@ -1377,15 +1359,15 @@ export class RichConsole {
 	warn = (...a: any[]) => this.writeLog('warning', ...a);
 	error = (...a: any[]) => this.writeLog('error', ...a);
 	critical = (...a: any[]) => this.writeLog('critical', ...a);
-	/** Alias kept for drop-in compatibility with the old log4js logger. */
+	// Alias kept for drop-in compatibility with the old log4js logger
 	log = (...a: any[]) => this.writeLog('info', ...a);
 
-	/** `console.print(Padding(Rule(...), (1, 2)))` — unshackle's section header. */
+	// `console.print(Padding(Rule(...), (1, 2)))` - unshackle's section header.
 	rule(title = '', pad: PaddingDims = [1, 2]) {
 		this.print(new Padding(new Rule(title), pad));
 	}
 
-	/** A transient spinner status line, padded like unshackle's. */
+	// A transient spinner status line, padded like unshackle's
 	status(text: RenderInput, pad: PaddingDims = [0, 5]): Live {
 		return new Live(new Padding(new Spinner(text), pad), { console: this, transient: true, refreshPerSecond: 12.5 }).start();
 	}

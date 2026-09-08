@@ -1,10 +1,6 @@
-/**
- * log.ts — drop-in replacement for the original log4js logger.
- *
- * Keeps the exact same public surface (`console.info/warn/error/debug/log`)
- * used across the codebase, but renders through the unshackle-style
- * RichConsole while still writing plain text to `logs/latest.log`.
- */
+// Logger. Drop-in for the log4js one that used to live here: same
+// console.info/warn/error/debug surface, but rendered through RichConsole.
+// logs/latest.log still gets plain text.
 
 import fs from 'fs';
 import path from 'path';
@@ -24,7 +20,7 @@ const makeLogFolder = () => {
 	}
 };
 
-/** File-only log4js instance; the console half is handled by RichConsole. */
+// File-only log4js instance; the console half is handled by RichConsole.
 const makeFileLogger = () => {
 	makeLogFolder();
 	log4js.configure({
@@ -79,7 +75,7 @@ if (process.env.ANIDL_LOG_LEVEL) {
 	if (['debug', 'info', 'warning', 'error', 'critical'].includes(lvl)) rich.level = lvl as LogLevel;
 }
 
-/** Redirect stray `global.console.*` calls into the rich console too. */
+// Redirect stray `global.console.*` calls into the rich console too
 const patchGlobalConsole = () => {
 	const g = global.console as any;
 	g.log = (...d: any[]) => rich.info(...d);
@@ -112,7 +108,7 @@ export const console = Object.assign(rich, {
 	// log4js parity aliases used in a few places
 	trace: (...a: any[]) => rich.debug(...a),
 	fatal: (...a: any[]) => rich.critical(...a),
-	/** Plain, unstyled output (bypasses markup) — for raw dumps. */
+	// Plain, unstyled output (bypasses markup) - for raw dumps
 	raw: (s: string) => rich.write(stripMarkup(s) + '\n')
 });
 

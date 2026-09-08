@@ -1,12 +1,7 @@
-/**
- * module.drm-cache.ts — vault-backed content key caching for the CDM layer.
- *
- * Sits in front of the Widevine / PlayReady licence requests: KIDs are parsed
- * out of the PSSH, looked up in the configured vaults, and only the genuinely
- * unknown ones cause a licence call. Newly obtained keys are pushed back.
- *
- * Origin: unshackle's Vaults + `prepare_drm` flow, adapted to aniDL's CDM API.
- */
+// Vault lookup in front of the CDM.
+//
+// Pulls the KIDs out of the PSSH, asks the vaults, and only calls the licence
+// server for whatever is still missing. Anything new gets written back.
 
 import { console } from './log';
 import { cekTree } from './module.console';
@@ -21,7 +16,6 @@ export interface KeyContainerLike {
 const WIDEVINE_SYSTEM_ID = 'edef8ba979d64acea3c827dcd51d21ed';
 const PLAYREADY_SYSTEM_ID = '9a04f07998404286ab92e65be0885f95';
 
-/* ─────────────────────────────────────────────────────────── PSSH parsing ── */
 
 function readU32(buf: Buffer, off: number): number {
 	return buf.readUInt32BE(off);
@@ -70,7 +64,7 @@ export function extractKids(pssh?: string): string[] {
 	return dedupe(kids);
 }
 
-/** Widevine PSSH protobuf: repeated bytes key_id = 2. */
+// Widevine PSSH protobuf: repeated bytes key_id = 2
 function parseWidevineProtobuf(data: Buffer): string[] {
 	const kids: string[] = [];
 	let i = 0;
@@ -100,7 +94,7 @@ function parseWidevineProtobuf(data: Buffer): string[] {
 	return kids;
 }
 
-/** PlayReady WRMHEADER (UTF-16LE XML) — <KID>base64</KID> / <KID VALUE="…"/>. */
+// PlayReady WRMHEADER (UTF-16LE XML) - <KID>base64</KID> / <KID VALUE="…"/>.
 function parsePlayReadyHeader(data: Buffer): string[] {
 	const start = data.length > 10 ? 10 : 0;
 	let xml: string;
@@ -133,14 +127,13 @@ function dedupe(kids: string[]): string[] {
 	return [...new Set(kids.map(normaliseKid))].filter((k) => k && k !== '0'.repeat(32));
 }
 
-/* ────────────────────────────────────────────────────────── vault wiring ── */
 
 let vaultsByService = new Map<string, Vaults>();
 let vaultConfigs: VaultConfig[] | undefined;
 let vaultWorkingDir = '.';
 let vaultsEnabled = true;
 
-/** Called once at startup from the CLI entry point. */
+// Called once at startup from the CLI entry point
 export function configureVaults(configs: VaultConfig[] | undefined, workingDir: string, enabled = true) {
 	vaultConfigs = configs;
 	vaultWorkingDir = workingDir;
@@ -161,14 +154,14 @@ export function getVaults(service: string): Vaults {
 }
 
 export interface DrmResolveOptions {
-	/** Service namespace in the vault, e.g. "crunchyroll". */
+	// Service namespace in the vault, e.g. "crunchyroll"
 	service: string;
-	/** "Widevine" | "PlayReady" — used for the printed CEK tree. */
+	// "Widevine" | "PlayReady" - used for the printed CEK tree
 	drm: 'Widevine' | 'PlayReady' | 'ClearKey';
 	pssh?: string;
-	/** Called only when the vault could not satisfy every KID. */
+	// Called only when the vault could not satisfy every KID
 	licence: () => Promise<KeyContainerLike[]>;
-	/** Print the unshackle-style key tree (default true). */
+	// print the key tree (default true)
 	print?: boolean;
 }
 
@@ -210,7 +203,7 @@ export async function resolveKeys(opts: DrmResolveOptions): Promise<KeyContainer
 		const toPush: KeyPair[] = keys.filter((k) => !sources.has(normaliseKid(k.kid))).map((k) => ({ kid: k.kid, key: k.key }));
 		if (vaults.length && toPush.length) await vaults.addKeys(toPush);
 	} else {
-		console.debug(`All [repr.number]${kids.length}[/] content key(s) served from vault — licence request skipped`);
+		console.debug(`All [repr.number]${kids.length}[/] content key(s) served from vault - licence request skipped`);
 	}
 
 	if (opts.print !== false && keys.length) {

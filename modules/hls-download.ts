@@ -47,7 +47,7 @@ export type HLSOptions = {
 	fsRetryTime?: number;
 	override?: 'Y' | 'y' | 'N' | 'n' | 'C' | 'c';
 	callback?: HLSCallback;
-	/** Row in the live download view that this stream should report into. */
+	// Row in the live download view that this stream should report into
 	trackKey?: string;
 };
 
@@ -80,9 +80,9 @@ type Data = {
 
 // hls class
 class hlsDownload {
-	/** Parts finished in this run, used to drive the live progress bar. */
+	// Parts finished in this run, used to drive the live progress bar
 	private uiDone = 0;
-	/** Most recent part error, used to derive an actionable network hint. */
+	// Most recent part error, used to derive an actionable network hint
 	private lastError: unknown;
 	private data: Data;
 	constructor(options: HLSOptions) {

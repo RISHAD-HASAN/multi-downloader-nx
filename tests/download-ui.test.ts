@@ -1,10 +1,7 @@
-/**
- * Verifies the live download view is actually wired into the download path.
- *
- * The rich components existed before this suite but nothing called them, so the
- * CLI rendered plain per-chunk log lines. These assertions fail if that wiring
- * is ever removed again.
- */
+// Verifies the live download view is actually wired into the download path.
+// The rich components existed before this suite but nothing called them, so the
+// CLI rendered plain per-chunk log lines. These assertions fail if that wiring
+// is ever removed again.
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';

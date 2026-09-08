@@ -562,10 +562,8 @@ Show the help output
 
 ## Content Key Vaults
 
-*Ported from [unshackle](https://github.com/unshackle-dl/unshackle).*
-
 A vault caches `KID -> CONTENT KEY` pairs per service. When a title is
-re-downloaded — or when another dub/season shares the same keys — aniDL reads
+re-downloaded  -  or when another dub/season shares the same keys  -  aniDL reads
 the key straight from the vault and never contacts the licence server.
 
 Configure in `config/vaults.yml`:
@@ -591,12 +589,10 @@ key_vaults:
 Local vaults are always queried before network vaults. Keys obtained from a
 licence are written back to every vault that does not set `no_push: true`.
 
-The SQLite schema is compatible with unshackle/devine vaults, so you can point
-`path` at an existing `key_vault.db`.
+Schema matches devine/unshackle vaults, so `path` can point at an existing
+`key_vault.db`.
 
 ## Console Theming
-
-*Ported from [unshackle](https://github.com/unshackle-dl/unshackle).*
 
 | Option | Description |
 | ------ | ----------- |

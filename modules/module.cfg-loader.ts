@@ -88,10 +88,7 @@ export type ConfigObject = {
 	gui: GUIConfig;
 };
 
-/**
- * Case-insensitive environment lookup (Windows env vars are case-insensitive).
- * Ported from the Yurasubs fork.
- */
+// Windows env vars are case insensitive, process.env is not.
 export const getEnv = (name: string): string | undefined => {
 	if (process.env[name] !== undefined) return process.env[name];
 	const upper = name.toUpperCase();
@@ -101,11 +98,7 @@ export const getEnv = (name: string): string | undefined => {
 	return undefined;
 };
 
-/**
- * Expand environment variables and `~` inside a config value, so bin-path.yml
- * can use %FFMPEG_PATH%, ${FFMPEG_PATH}, $FFMPEG_PATH or ~/bin on any platform.
- * Ported from the Yurasubs fork.
- */
+// Expand %VAR%, ${VAR}, $VAR and ~ so bin-path.yml works on any platform.
 export const resolveEnv = (str: string): string => {
 	if (!str || typeof str !== 'string') return str;
 	// Windows %VAR% syntax

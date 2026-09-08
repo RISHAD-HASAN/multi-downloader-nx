@@ -68,7 +68,7 @@ const applyUrl = (argv: any): boolean => {
 
 	if (argv.debug) console.level = 'debug';
 
-	// Content key vaults (ported from unshackle) — see config/vaults.yml
+	// Content key vaults (ported from unshackle) - see config/vaults.yml
 	const vaultCfg = yamlCfg.loadVaultCfg();
 	configureVaults(vaultCfg.key_vaults, yamlCfg.workingDir, vaultCfg.enabled !== false);
 

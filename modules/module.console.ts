@@ -1,11 +1,5 @@
-/**
- * module.console.ts — unshackle-style console presentation for aniDL.
- *
- * Provides the banner, section rules, listing panels, track trees, content-key
- * trees and the live download table, all built on module.rich.ts.
- *
- * Origin of the visual language: https://github.com/unshackle-dl/unshackle
- */
+// Console presentation built on module.rich: banner, section rules, listing
+// panels, track trees, content key trees and the live download table.
 
 import {
 	BOX,
@@ -54,7 +48,6 @@ export {
 
 export const console_ = new RichConsole({ showTime: false, logPadding: [0, 5] });
 
-/* ─────────────────────────────────────────────────────────────── banner ── */
 
 const ANIDL_ASCII = [
 	' ▄▄▄· ▐ ▄ ▪  ·▄▄▄▄  ▄▄▌  ',
@@ -83,19 +76,18 @@ export function printBanner(version: string, extra?: string) {
 	);
 }
 
-/* ────────────────────────────────────────────────────── section helpers ── */
 
-/** `console.print(Padding(Rule("[rule.text]…"), (1, 2)))` */
+// `console.print(Padding(Rule("[rule.text]…"), (1, 2)))`
 export function rule(title: string, pad: [number, number] | number = [1, 2]) {
 	console_.print(new Padding(new Rule(`[rule.text]${title}[/]`), pad));
 }
 
-/** A padded body block at unshackle's standard (0, 5) indent. */
+// A padded body block at unshackle's standard (0, 5) indent
 export function block(renderable: RenderInput, pad: [number, number] | [number, number, number, number] = [0, 5]) {
 	console_.print(new Padding(renderable, pad));
 }
 
-/** unshackle's `listing_panel` — a titled panel listing renderables. */
+// unshackle's `listing_panel` - a titled panel listing renderables
 export function listingPanel(items: RenderInput[], title: string): Panel {
 	const grid = Table.grid({ padding: [0, 1] });
 	if (items.length === 0) grid.addRow('[text2]Nothing to list[/]');
@@ -103,7 +95,6 @@ export function listingPanel(items: RenderInput[], title: string): Panel {
 	return new Panel(grid, { title: `[panel.title]${title}[/]`, box: BOX.ROUNDED, padding: [0, 1] });
 }
 
-/* ───────────────────────────────────────────────────────── track trees ── */
 
 export interface TrackLike {
 	type: 'Video' | 'Audio' | 'Subtitle' | 'Chapter' | 'Attachment';
@@ -139,7 +130,7 @@ export class DownloadTable {
 	private table = Table.grid();
 	private live?: Live;
 	private tracks: Array<TrackLike & { key: string }> = [];
-	/** Extra renderables appended below the tracks (e.g. the CEK tree). */
+	// Extra renderables appended below the tracks (e.g. the CEK tree)
 	public extras = Table.grid();
 
 	constructor(tracks: Array<TrackLike & { key: string }>) {
@@ -175,7 +166,7 @@ export class DownloadTable {
 		return this;
 	}
 
-	/** Register a track after the view is already live (extra dubs, subtitles). */
+	// Register a track after the view is already live (extra dubs, subtitles).
 	addTrack(track: TrackLike & { key: string }) {
 		if (this.taskByKey.has(track.key)) return;
 		this.tracks.push(track);
@@ -199,7 +190,7 @@ export class DownloadTable {
 		}
 	}
 
-	/** Attach/refresh a content-key tree beneath the track list. */
+	// Attach/refresh a content-key tree beneath the track list
 	setKeyTree(tree: Tree) {
 		this.extras = Table.grid();
 		this.extras.addRow(tree);
@@ -212,7 +203,7 @@ export class DownloadTable {
 	}
 }
 
-/** Renders exactly one task of a Progress — used inside the track tree. */
+// Renders exactly one task of a Progress - used inside the track tree
 class SingleTask {
 	constructor(
 		private progress: Progress,
@@ -231,7 +222,6 @@ class SingleTask {
 	}
 }
 
-/* ───────────────────────────────────────────────────── content-key tree ── */
 
 /**
  * unshackle's CEK tree: `Widevine(PSSH…)` with `kid:key` leaves, annotated with
@@ -252,7 +242,6 @@ export function cekTree(drm: 'Widevine' | 'PlayReady' | 'ClearKey', pssh: string
 	return tree;
 }
 
-/* ─────────────────────────────────────────────────────────────── prompts ── */
 
 export function selectionCancelled() {
 	console_.print(new Padding(':x: Selection Cancelled...', [0, 5, 1, 5]));
@@ -262,7 +251,7 @@ export function downloadCancelled() {
 	console_.print(new Padding(':x: Download Cancelled...', [0, 5, 1, 5]));
 }
 
-/** "Processed all titles in 1:23" footer. */
+// "Processed all titles in 1:23" footer
 export function elapsedFooter(label: string, seconds: number) {
 	console_.print(new Padding(`${label} [progress.elapsed]${formatDuration(seconds)}[/]`, [0, 5, 1, 5]));
 }

@@ -1,11 +1,8 @@
-/**
- * Diagnostics for transport failures.
- *
- * Node's fetch reports nearly every network problem as `TypeError: fetch failed`
- * with the real reason buried in `cause`. A live download died with 300+ lines of
- * `TypeError: fetch failed` / `Part 130: undefined` and no indication of why, so
- * these helpers unwrap the chain and produce an actionable hint.
- */
+// Diagnostics for transport failures.
+// Node's fetch reports nearly every network problem as `TypeError: fetch failed`
+// with the real reason buried in `cause`. A live download died with 300+ lines of
+// `TypeError: fetch failed` / `Part 130: undefined` and no indication of why, so
+// these helpers unwrap the chain and produce an actionable hint.
 import assert from 'assert';
 import { describeError, errorCodes, networkHint } from '../modules/module.error';
 

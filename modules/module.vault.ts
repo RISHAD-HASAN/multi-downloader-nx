@@ -1,14 +1,9 @@
-/**
- * module.vault.ts — content key vaults, ported from unshackle.
- *
- * A vault caches `KID -> CONTENT KEY` pairs per service so that re-downloading
- * a title (or grabbing another dub of the same episode) never has to hit the
- * DRM licence server again. Local vaults are consulted first, then network
- * vaults; any key that was missing from a vault is pushed back to it.
- *
- * Origin: https://github.com/unshackle-dl/unshackle
- *   (unshackle/core/vault.py, unshackle/core/vaults.py, unshackle/vaults/*)
- */
+// Content key vaults.
+//
+// Caches KID -> CONTENT KEY per service so re-downloading a title (or grabbing
+// another dub that shares keys) never hits the licence server again. Local
+// vaults are checked before network ones. The SQLite schema matches devine's,
+// so an existing key_vault.db can be pointed at directly.
 
 import fs from 'fs';
 import path from 'path';
@@ -29,9 +24,9 @@ export interface KeyPair {
 	key: string;
 }
 
-/** Abstract vault — mirrors unshackle's `Vault` ABC. */
+// Base class for every vault backend.
 export abstract class Vault {
-	/** Local vaults are tried before network vaults by the Vaults manager. */
+	// Local vaults are tried before network vaults by the Vaults manager
 	public local = false;
 
 	constructor(
@@ -43,19 +38,18 @@ export abstract class Vault {
 		return `${this.name} ${this.constructor.name}`;
 	}
 
-	/** Look up a single content key by KID for a service. */
+	// Look up a single content key by KID for a service
 	abstract getKey(kid: string, service: string): Promise<string | undefined>;
-	/** All known keys for a service. */
+	// All known keys for a service
 	abstract getKeys(service: string): Promise<KeyPair[]>;
-	/** Store one KID:KEY. Returns true if stored (or already present). */
+	// Store one KID:KEY. Returns true if stored (or already present)
 	abstract addKey(service: string, kid: string, key: string): Promise<boolean>;
-	/** Store many; returns the number of *new* keys written. */
+	// Store many; returns the number of *new* keys written
 	abstract addKeys(service: string, pairs: KeyPair[]): Promise<number>;
-	/** Service namespaces this vault knows about. */
+	// Service namespaces this vault knows about
 	abstract getServices(): Promise<string[]>;
 }
 
-/* ───────────────────────────────────────────────────────── local vaults ── */
 
 type SqliteModule = {
 	DatabaseSync: new (path: string) => {
@@ -76,7 +70,7 @@ function loadSqlite(): SqliteModule | undefined {
 }
 
 /**
- * SQLite vault — one table per service, `kid` TEXT PK + `key_` TEXT.
+ * SQLite vault - one table per service, `kid` TEXT PK + `key_` TEXT.
  * Table layout is byte-compatible with unshackle/devine vaults, so an existing
  * `key_vault.db` from unshackle can be pointed at directly.
  */
@@ -98,7 +92,7 @@ export class SQLiteVault extends Vault {
 		const sqlite = loadSqlite();
 		if (!sqlite) {
 			if (this.available) {
-				console.warn(`Vault [text2]${this.name}[/]: node:sqlite unavailable (needs Node >= 22.5) — vault disabled`);
+				console.warn(`Vault [text2]${this.name}[/]: node:sqlite unavailable (needs Node >= 22.5) - vault disabled`);
 				this.available = false;
 			}
 			return undefined;
@@ -110,7 +104,7 @@ export class SQLiteVault extends Vault {
 		return this.db;
 	}
 
-	/** Service tables are matched case-insensitively, like unshackle. */
+	// Service tables are matched case-insensitively, like unshackle
 	private resolveTable(service: string): string | undefined {
 		const db = this.connect();
 		if (!db) return undefined;
@@ -176,7 +170,7 @@ export class SQLiteVault extends Vault {
 }
 
 /**
- * JSON-file vault — zero-dependency local fallback for environments without
+ * JSON-file vault - zero-dependency local fallback for environments without
  * `node:sqlite`. Same semantics, stored as `{ service: { kid: key } }`.
  */
 export class JSONVault extends Vault {
@@ -249,10 +243,9 @@ export class JSONVault extends Vault {
 	}
 }
 
-/* ─────────────────────────────────────────────────────── network vaults ── */
 
 /**
- * HTTP/API vault — talks to a remote key store (the "API" vault format used by
+ * HTTP/API vault - talks to a remote key store (the "API" vault format used by
  * unshackle: POST {method, params, ...} with an `X-Secret-Key` header).
  */
 export class APIVault extends Vault {
@@ -333,17 +326,16 @@ export class APIVault extends Vault {
 	}
 }
 
-/* ─────────────────────────────────────────────────────── vault manager ── */
 
 export interface VaultHit {
 	kid: string;
 	key: string;
-	/** Vault name the key came from, or undefined if it came from a licence. */
+	// Vault name the key came from, or undefined if it came from a licence
 	from?: string;
 }
 
 /**
- * `Vaults` — iterates every configured vault, local ones first.
+ * `Vaults` - iterates every configured vault, local ones first.
  * Mirrors unshackle/core/vaults.py.
  */
 export class Vaults {
@@ -361,7 +353,7 @@ export class Vaults {
 		this.vaults.sort((a, b) => Number(b.local) - Number(a.local));
 	}
 
-	/** Get a key by KID; returns the key and the vault it came from. */
+	// Get a key by KID; returns the key and the vault it came from
 	async getKey(kid: string): Promise<{ key?: string; from?: Vault }> {
 		for (const vault of this.vaults) {
 			try {
@@ -374,7 +366,7 @@ export class Vaults {
 		return {};
 	}
 
-	/** Bulk-resolve KIDs, returning a map of found keys. */
+	// Bulk-resolve KIDs, returning a map of found keys
 	async getKeys(kids: string[]): Promise<Map<string, VaultHit>> {
 		const found = new Map<string, VaultHit>();
 		for (const kid of kids) {
@@ -410,7 +402,6 @@ export class Vaults {
 	}
 }
 
-/* ──────────────────────────────────────────────────────── configuration ── */
 
 export interface VaultConfig {
 	type: 'SQLite' | 'JSON' | 'API' | 'HTTP';

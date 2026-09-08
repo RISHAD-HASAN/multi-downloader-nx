@@ -41,14 +41,14 @@ const KEY_A = '2b7e151628aed2a6abf7158809cf4f3c';
 const KEY_B = '0123456789abcdef0123456789abcdef';
 
 (async () => {
-  // 1 — PSSH parsing
+  // 1 - PSSH parsing
   assert.deepStrictEqual(extractKids(buildWidevinePssh([KID_A, KID_B])), [KID_A, KID_B]);
   assert.deepStrictEqual(extractKids(buildV1Pssh([KID_A])), [KID_A]);
   assert.deepStrictEqual(extractKids(undefined), []);
   assert.deepStrictEqual(extractKids('not-base64!!'), []);
   console.log('✓ PSSH KID extraction (v0 protobuf, v1 header, bad input)');
 
-  // 2 — JSON vault round-trip
+  // 2 - JSON vault round-trip
   const f = '/tmp/kv-test.json';
   if (fs.existsSync(f)) fs.unlinkSync(f);
   const v = new JSONVault('test', f);
@@ -60,7 +60,7 @@ const KEY_B = '0123456789abcdef0123456789abcdef';
   assert.strictEqual(await v.addKeys('crunchyroll', [{ kid: KID_B, key: '0'.repeat(32) }]), 0, 'null key rejected');
   console.log('✓ JSON vault: insert, dedupe, case-insensitive lookup, null-key rejection');
 
-  // 3 — SQLite vault (skipped when node:sqlite is unavailable)
+  // 3 - SQLite vault (skipped when node:sqlite is unavailable)
   const dbf = '/tmp/kv-test.db';
   if (fs.existsSync(dbf)) fs.unlinkSync(dbf);
   const sv = new SQLiteVault('sqlite', dbf);
@@ -72,7 +72,7 @@ const KEY_B = '0123456789abcdef0123456789abcdef';
     console.log('- SQLite vault skipped (node:sqlite needs Node >= 22.5; running ' + process.version + ')');
   }
 
-  // 4 — resolveKeys: licence on miss, vault on hit
+  // 4 - resolveKeys: licence on miss, vault on hit
   configureVaults([{ type: 'JSON', name: 'Local JSON', path: f }], '/', true);
   const pssh = buildWidevinePssh([KID_A, KID_B]);
   let licenceCalls = 0;
@@ -90,7 +90,7 @@ const KEY_B = '0123456789abcdef0123456789abcdef';
   );
   console.log('✓ resolveKeys: licence fetched once, second run fully vault-served (licence skipped)');
 
-  // 5 — vault disabled -> always hit the licence server
+  // 5 - vault disabled -> always hit the licence server
   configureVaults([{ type: 'JSON', name: 'Local JSON', path: f }], '/', false);
   await resolveKeys({ service: 'crunchyroll', drm: 'Widevine', pssh, licence, print: false });
   assert.strictEqual(licenceCalls, 2, 'disabled vaults must bypass the cache');

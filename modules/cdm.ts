@@ -204,7 +204,7 @@ export async function getKeysWVD(
 	})) as KeyContainer[];
 }
 
-/** Vault-aware PlayReady key retrieval. See {@link getKeysWVD}. */
+// Vault-aware PlayReady key retrieval. See {@link getKeysWVD}
 export async function getKeysPRD(
 	pssh: string | undefined,
 	licenseServer: string,

@@ -1,10 +1,8 @@
-/**
- * Listing verbosity is context-dependent:
- *   --srz X            -> season list only
- *   --srz X -s S       -> episode list only (+ separator)
- *   --srz X -s S -e 9  -> neither; go straight to the download
- * Plus: the account line shows the username, never the email.
- */
+// Listing verbosity is context-dependent:
+//   --srz X            -> season list only
+//   --srz X -s S       -> episode list only (+ separator)
+//   --srz X -s S -e 9  -> neither; go straight to the download
+// Plus: the account line shows the username, never the email.
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';

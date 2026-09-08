@@ -1,8 +1,6 @@
-/**
- * Renders a representative Crunchyroll CLI session with the unshackle-style
- * console, in every available theme, and writes an HTML preview.
- * Dev tool only — not part of the shipped CLI.
- */
+// Renders a representative Crunchyroll CLI session with the unshackle-style
+// console, in every available theme, and writes an HTML preview.
+// Dev tool only - not part of the shipped CLI.
 import fs from 'fs';
 import {
 	GradientBar,
@@ -72,12 +70,12 @@ function session(themeName: string): string {
 	c.info('Selected [repr.number]1[/] video, [repr.number]2[/] audio, [repr.number]3[/] subtitle track(s)');
 	c.info('Getting decryption keys with [cyan]widevine[/]');
 
-	// content key tree — vault hit
+	// content key tree - vault hit
 	const cek = new Tree(new Text('[cyan]Widevine[/][text2](AAAAW3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAADsIARIQ…)[/]'));
 	cek.add('[text2]8f2c1a3b4d5e6f708192a3b4c5d6e7f8:2b7e151628aed2a6abf7158809cf4f3c[/] [text2]from Local Vault[/] [green]*[/]');
 	cek.add('[text2]aabbccddeeff00112233445566778899:0123456789abcdef0123456789abcdef[/] [text2]from Local Vault[/] [green]*[/]');
 	c.print(new Padding(cek, [0, 5]));
-	c.debug('All [repr.number]2[/] content key(s) served from vault — licence request skipped');
+	c.debug('All [repr.number]2[/] content key(s) served from vault - licence request skipped');
 
 	// live download table (static snapshot)
 	const p = new Progress(['spinner', 'bar', '•', 'remaining', '•', 'downloaded'], { barWidth: 30 });
@@ -124,7 +122,6 @@ function session(themeName: string): string {
 	return out.join('');
 }
 
-/* ── ANSI -> HTML ────────────────────────────────────────────────────────── */
 function ansiToHtml(input: string): string {
 	let html = '';
 	let open = false;
@@ -192,7 +189,7 @@ const blocks = themes
 	.join('\n');
 
 const html = `<!doctype html>
-<html><head><meta charset="utf-8"><title>aniDL — unshackle-style CLI output</title>
+<html><head><meta charset="utf-8"><title>aniDL - unshackle-style CLI output</title>
 <style>
   :root { color-scheme: dark; }
   body { margin:0; padding:32px; background:#14141c; color:#cdd6f4;
