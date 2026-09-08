@@ -457,7 +457,7 @@ class Merger {
 			console.debug(`[${type} Done]`);
 		}
 		// Final, single line the user actually cares about
-		console.print(new Padding(`[green]${this.options.output}[/] [text2]done[/]`, [1, 5, 1, 5]));
+		console.print(new Padding(`[green]${this.options.output}[/] [text2]done[/]`, [1, 0, 1, 5]));
 	}
 
 	public cleanUp() {

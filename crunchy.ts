@@ -3110,7 +3110,11 @@ export default class Crunchy implements ServiceClass {
 									sxData.fonts = fontsData.assFonts(sBody) as Font[];
 								}
 								fs.writeFileSync(sxData.path, sBody);
-								addTrack({ key: `sub-${sxData.file}`, type: 'Subtitle', label: sxData.file });
+								addTrack({
+									key: `sub-${sxData.file}`,
+									type: 'Subtitle',
+									label: `${sxData.path.endsWith('.ass') ? 'ASS' : 'VTT'} | ${sxData.language?.code ?? '??'} | ${sxData.title ?? sxData.file}`
+								});
 								trackState(`sub-${sxData.file}`, 'Downloaded');
 								console.debug(`Subtitle downloaded: ${sxData.file}`);
 								files.push({

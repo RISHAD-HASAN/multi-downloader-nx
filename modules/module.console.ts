@@ -157,7 +157,8 @@ export class DownloadTable {
 			const branch = tree.add(`[repr.number]${of.length}[/] ${plural}`);
 			for (const t of of) {
 				const cell = Table.grid();
-				cell.addRow(new Text(t.label, { style: 'text2', overflow: 'fold' }));
+				// keep every track on one line; long names get an ellipsis
+				cell.addRow(new Text(t.label, { style: 'text2', overflow: 'ellipsis' }));
 				const taskId = this.taskByKey.get(t.key);
 				if (taskId !== undefined) cell.addRow(new SingleTask(this.progress, taskId));
 				branch.add(cell);
