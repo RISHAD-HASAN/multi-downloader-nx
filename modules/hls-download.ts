@@ -10,6 +10,7 @@ import Helper from './module.helper';
 import * as reqModule from './module.fetch';
 import { Manifest } from 'm3u8-parser';
 import { sessionOwns, trackProgress } from './module.download-ui';
+import { describeError, networkHint } from './module.error';
 
 const req = new reqModule.Req();
 
@@ -81,6 +82,8 @@ type Data = {
 class hlsDownload {
 	/** Parts finished in this run, used to drive the live progress bar. */
 	private uiDone = 0;
+	/** Most recent part error, used to derive an actionable network hint. */
+	private lastError: unknown;
 	private data: Data;
 	constructor(options: HLSOptions) {
 		// check playlist
@@ -257,12 +260,13 @@ class hlsDownload {
 								});
 							}
 						} catch (error: any) {
+							this.lastError = error;
 							retriesLeft--;
 							console.warn(`Retrying part ${error.p + 1 + this.data.offset} (${this.data.retries - retriesLeft}/${this.data.retries})`);
 							if (retriesLeft > 0) {
 								await new Promise((resolve) => setTimeout(resolve, 1000));
 							} else {
-								console.error(`Part ${error.p + 1 + this.data.offset} download failed after ${this.data.retries} retries:\n\t${error.message}`);
+								console.error(`Part ${error.p + 1 + this.data.offset} download failed after ${this.data.retries} retries: ${describeError(error)}`);
 								errcnt++;
 							}
 						}
@@ -279,6 +283,8 @@ class hlsDownload {
 			// catch error
 			if (errcnt > 0) {
 				console.error(`${errcnt} parts not downloaded`);
+				const hint = this.lastError ? networkHint(this.lastError) : undefined;
+				if (hint) console.error(hint);
 				return { ok: false, parts: this.data.parts };
 			}
 			// write downloaded
@@ -370,7 +376,7 @@ class hlsDownload {
 				segOffset,
 				false
 			);
-			if (!part) throw Error();
+			if (!part) throw new Error('no response body (see the warning above for the transport error)');
 			// if (this.data.checkPartLength) {
 			//   this.data.checkPartLength = false;
 			//   console.warn(`Part ${segIndex + segOffset + 1}: can't check parts size!`);
@@ -450,13 +456,16 @@ const extFn = {
 
 		const partReq = await req.getData(uri, {
 			method: 'GET',
-			headers: headers
+			headers: headers,
+			silent: true
 		});
 
 		if (!partReq.res || !partReq.ok) {
 			const partType = isKey ? 'Key' : 'Part';
 			const partIndx = partIndex + 1 + segOffset;
-			console.warn(`%s %s: ${partReq.error?.res?.statusText}`, partType, partIndx);
+			// transport failures carry no .res, so fall back to the unwrapped cause
+			const reason = partReq.error?.res?.statusText || describeError(partReq.error);
+			console.warn(`${partType} ${partIndx}: ${reason}`);
 			return;
 		}
 

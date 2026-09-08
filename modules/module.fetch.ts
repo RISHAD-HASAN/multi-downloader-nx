@@ -3,6 +3,7 @@ import * as yargs from './module.app-args';
 import { console } from './log';
 import { argvC } from './module.app-args';
 import { Agent, ProxyAgent, fetch, RequestInit } from 'undici';
+import { describeError } from './module.error';
 
 const http1Agent = new Agent({
 	connections: 16,
@@ -22,6 +23,8 @@ export type Params = {
 
 type CustomParams = {
 	useProxy: boolean;
+	/** Suppress console output; the caller reports the failure itself. */
+	silent: boolean;
 };
 
 type GetDataResponse = {
@@ -142,12 +145,15 @@ export class Req {
 			} & TypeError & {
 					res: Response;
 				};
-			if (error.res && error.res.status && error.res.statusText) {
-				console.error(`${error.name} ${error.res.status}: ${error.res.statusText}`);
-			} else {
-				console.error(`${error.name}: ${error.res?.statusText || error.message}`);
+			// undici hides the real reason in a nested `cause` chain
+			if (!params.silent) {
+				if (error.res && error.res.status && error.res.statusText) {
+					console.error(`${error.name} ${error.res.status}: ${error.res.statusText}`);
+				} else {
+					console.error(describeError(error));
+				}
 			}
-			if (error.res) {
+			if (error.res && !params.silent) {
 				const body = await error.res.text();
 				const docTitle = body.match(/<title>(.*)<\/title>/);
 				if (body && docTitle) {
