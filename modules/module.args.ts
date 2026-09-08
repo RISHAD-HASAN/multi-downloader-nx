@@ -236,7 +236,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		group: 'util',
 		describe: 'Colour theme for the CLI output',
 		docDescribe:
-			'Colour palette used by the console renderer (ported from unshackle).' +
+			'Colour palette used by the console renderer.' +
 			'\nAvailable: catppuccin-mocha, dracula, nord, gruvbox, one-dark, mono.',
 		service: ['all'],
 		type: 'string',

@@ -380,7 +380,7 @@ const getState = (): GuiState => {
 };
 
 /**
- * Load `config/vaults.yml` - the content key vault chain (ported from unshackle).
+ * Load config/vaults.yml. Absent file means we still want a local vault.
  * Returns an empty list when the file is absent so vaults stay opt-in.
  */
 const loadVaultCfg = (): { key_vaults?: VaultConfig[]; enabled?: boolean } => {

@@ -109,7 +109,7 @@ export let argvC: {
 	listFormats: boolean;
 	// Crunchyroll high-bitrate CENC DASH streams (fork: Yurasubs)
 	majin: boolean;
-	// Console presentation (ported from unshackle)
+	// console output
 	theme: string;
 	noColor: boolean;
 };

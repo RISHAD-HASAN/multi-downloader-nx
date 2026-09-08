@@ -1,7 +1,6 @@
 // The "majin" encode is a separate, higher-bitrate CENC DASH rendition served
 // from a different path. These tests pin the URL rewrite against real
 // Crunchyroll manifest URLs (taken from actual download logs).
-// Ported from the Yurasubs fork.
 import assert from 'assert';
 import fs from 'fs';
 import path from 'path';

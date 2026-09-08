@@ -36,7 +36,7 @@ layoutResFix: false
 scaledBorderAndShadow: 'no'
 #signs sub forced? (Should be always set to no)
 signSubsForced: 'no'
-# Colour palette for the CLI renderer (ported from unshackle)
+# Colour palette for the CLI renderer
 # catppuccin-mocha | dracula | nord | gruvbox | one-dark | mono
 theme: 'catppuccin-mocha'
 # Disable all colour/styling in console output
