@@ -18,6 +18,8 @@ import * as yamlCfg from './modules/module.cfg-loader';
 import * as yargs from './modules/module.app-args';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
 import { canDecrypt, getKeysPRD, getKeysWVD, cdm } from './modules/cdm';
+import { beginSession, endSession, trackState, type UITrack } from './modules/module.download-ui';
+import { block, tracksTree } from './modules/module.console';
 
 // load req
 import { domain, api } from './modules/module.api-urls';
@@ -2151,8 +2153,12 @@ export default class Crunchy implements ServiceClass {
 						const chosenVideoSegments = videos[chosenVideoQuality];
 						const chosenAudioSegments = audios[chosenAudioQuality];
 
-						console.info(`Available Video Qualities:\n\t${videos.map((a, ind) => `[${ind + 1}] ${a.resolutionText}`).join('\n\t')}`);
-						console.info(`Available Audio Qualities:\n\t${audios.map((a, ind) => `[${ind + 1}] ${a.resolutionText}`).join('\n\t')}`);
+						// unshackle-style available-track tree, grouped by track type
+						const availTree = tracksTree([
+							...videos.map((a, ind) => ({ type: 'Video' as const, label: `[repr.number]${ind + 1}[/] ${a.resolutionText}` })),
+							...audios.map((a, ind) => ({ type: 'Audio' as const, label: `[repr.number]${ind + 1}[/] ${a.resolutionText}` }))
+						]);
+						block(availTree);
 
 						variables.push(
 							{
@@ -2175,6 +2181,24 @@ export default class Crunchy implements ServiceClass {
 						console.info(
 							`Selected quality: \n\tVideo: ${chosenVideoSegments.resolutionText}\n\tAudio: ${chosenAudioSegments.resolutionText}\n\tVideo Server: ${vselectedServer}\n\tAudio Server: ${aselectedServer}`
 						);
+
+						// Open the live download view (unshackle-style track tree + bars)
+						const uiTracks: UITrack[] = [];
+						if (!options.novids) {
+							uiTracks.push({
+								key: 'video',
+								type: 'Video',
+								label: `${chosenVideoSegments.resolutionText} | ${vselectedServer}`
+							});
+						}
+						if (chosenAudioSegments && !options.noaudio) {
+							uiTracks.push({
+								key: 'audio',
+								type: 'Audio',
+								label: `${chosenAudioSegments.resolutionText} | ${lang.name} | ${aselectedServer}`
+							});
+						}
+						beginSession(uiTracks);
 						console.info('Stream URL:', chosenVideoSegments.segments[0].uri.split(',.urlset')[0]);
 						// TODO check filename
 						fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
@@ -2310,6 +2334,7 @@ export default class Crunchy implements ServiceClass {
 								segments: chosenVideoSegments.segments
 							};
 							const videoDownload = await new streamdl({
+								trackKey: 'video',
 								output: chosenVideoSegments.pssh_wvd || chosenVideoSegments.pssh_prd ? `${tempTsFile}.video.enc.m4s` : `${tsFile}.video.m4s`,
 								timeout: options.timeout,
 								m3u8json: videoJson,
@@ -2330,8 +2355,11 @@ export default class Crunchy implements ServiceClass {
 									: undefined
 							}).download();
 							if (!videoDownload.ok) {
+								trackState('video', 'FAILED');
 								console.error(`DL Stats: ${JSON.stringify(videoDownload.parts)}\n`);
 								dlFailed = true;
+							} else {
+								trackState('video', 'Downloaded');
 							}
 							dlVideoOnce = true;
 							videoDownloaded = true;
@@ -2352,6 +2380,7 @@ export default class Crunchy implements ServiceClass {
 								segments: chosenAudioSegments.segments
 							};
 							const audioDownload = await new streamdl({
+								trackKey: 'audio',
 								output: chosenVideoSegments.pssh_wvd || chosenVideoSegments.pssh_prd ? `${tempTsFile}.audio.enc.m4s` : `${tsFile}.audio.m4s`,
 								timeout: options.timeout,
 								m3u8json: audioJson,
@@ -2372,13 +2401,20 @@ export default class Crunchy implements ServiceClass {
 									: undefined
 							}).download();
 							if (!audioDownload.ok) {
+								trackState('audio', 'FAILED');
 								console.error(`DL Stats: ${JSON.stringify(audioDownload.parts)}\n`);
 								dlFailed = true;
+							} else {
+								trackState('audio', 'Downloaded');
 							}
 							audioDownloaded = true;
 						} else if (options.noaudio) {
 							console.info('Skipping audio download...');
 						}
+
+						// Close the live view: the decrypters write straight to stdout and
+						// would otherwise fight the Live region for the same lines.
+						endSession();
 
 						//Handle Decryption if needed
 						if (

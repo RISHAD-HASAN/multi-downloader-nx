@@ -9,6 +9,7 @@ import { ProgressData } from '../@types/messageHandler';
 import Helper from './module.helper';
 import * as reqModule from './module.fetch';
 import { Manifest } from 'm3u8-parser';
+import { sessionOwns, trackProgress } from './module.download-ui';
 
 const req = new reqModule.Req();
 
@@ -45,6 +46,8 @@ export type HLSOptions = {
 	fsRetryTime?: number;
 	override?: 'Y' | 'y' | 'N' | 'n' | 'C' | 'c';
 	callback?: HLSCallback;
+	/** Row in the live download view that this stream should report into. */
+	trackKey?: string;
 };
 
 type Data = {
@@ -69,12 +72,15 @@ type Data = {
 	bytesDownloaded: number;
 	waitTime: number;
 	callback?: HLSCallback;
+	trackKey?: string;
 	override?: string;
 	dateStart: number;
 };
 
 // hls class
 class hlsDownload {
+	/** Parts finished in this run, used to drive the live progress bar. */
+	private uiDone = 0;
 	private data: Data;
 	constructor(options: HLSOptions) {
 		// check playlist
@@ -102,6 +108,7 @@ class hlsDownload {
 			bytesDownloaded: 0,
 			waitTime: options.fsRetryTime ?? 1000 * 5,
 			callback: options.callback,
+			trackKey: options.trackKey,
 			override: options.override,
 			dateStart: 0
 		};
@@ -241,6 +248,14 @@ class hlsDownload {
 							const r = await downloadFn();
 							res[px - offset] = r.dec;
 							success = true;
+							// feed the live download view one tick per part, not per chunk
+							this.uiDone++;
+							if (this.data.trackKey) {
+								trackProgress(this.data.trackKey, {
+									completed: this.data.offset + this.uiDone,
+									bytes: this.data.bytesDownloaded
+								});
+							}
 						} catch (error: any) {
 							retriesLeft--;
 							console.warn(`Retrying part ${error.p + 1 + this.data.offset} (${this.data.retries - retriesLeft}/${this.data.retries})`);
@@ -308,9 +323,18 @@ class hlsDownload {
 				if (s * 8 < 1000000000) return `${((s * 8) / 1000000).toFixed(2)} MBit/s`;
 				return `${((s * 8) / 1000000000).toFixed(2)} GBit/s`;
 			}
-			console.info(
-				`${downloadedSeg} of ${totalSeg} parts downloaded [${data.percent}%] (${Helper.formatTime(parseInt((data.time / 1000).toFixed(0)))} | ${formatDLSpeedB(data.downloadSpeed)} / ${formatDLSpeedBit(data.downloadSpeed)})`
-			);
+			if (sessionOwns(this.data.trackKey)) {
+				// the live view renders progress; keep stdout free of per-chunk lines
+				trackProgress(this.data.trackKey as string, {
+					completed: downloadedSeg + this.data.offset,
+					total: totalSeg,
+					bytes: this.data.bytesDownloaded
+				});
+			} else {
+				console.info(
+					`${downloadedSeg} of ${totalSeg} parts downloaded [${data.percent}%] (${Helper.formatTime(parseInt((data.time / 1000).toFixed(0)))} | ${formatDLSpeedB(data.downloadSpeed)} / ${formatDLSpeedBit(data.downloadSpeed)})`
+				);
+			}
 			if (this.data.callback)
 				this.data.callback({
 					total: this.data.parts.total,

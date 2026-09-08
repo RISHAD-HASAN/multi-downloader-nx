@@ -143,6 +143,30 @@ pnpm preview:cli            # regenerate cli-preview.html
 
 ### Regressions fixed during verification
 
+**The live download view was built but never wired in.** `module.console.ts`
+shipped `DownloadTable` / `tracksTree` and they passed their unit tests, but no
+caller used them — so the CLI printed the original per-chunk
+`48 of 355 parts downloaded [14%]` lines and none of the unshackle download UI.
+Now wired end to end:
+
+- `modules/module.download-ui.ts` (new) owns a single live session: a track tree
+  grouped by type, each row with spinner, gradient bar, ETA and transferred/speed,
+  repainted atomically by `Live`.
+- `hls-download.ts` gained a `trackKey` option and reports **per part** (not per
+  chunk of `partsize`), so the bar moves smoothly; the old text line is suppressed
+  while the live view owns that track.
+- `crunchy.ts` opens the session after quality selection, tags the video/audio
+  streams, marks `Downloaded`/`FAILED`, and renders the available qualities as a
+  track tree instead of a flat list.
+- The session is closed **before** decryption, because shaka-packager and
+  mp4decrypt write straight to stdout and would corrupt the live region.
+- GUI mode never activates it, and non-TTY output degrades to a single final render.
+
+`tests/download-ui.test.ts` asserts the wiring itself, so it cannot silently
+regress again.
+
+
+
 **Packaged builds silently lost the key vault.** `modules/build.ts` copies config
 files into the build output individually, and `config/vaults.yml` was not on that
 list — so every `build-windows-*-cli` binary would start with vaults disabled and
