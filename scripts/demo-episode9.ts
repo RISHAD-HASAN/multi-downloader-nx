@@ -20,21 +20,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
 	console_.info('[S3E9] - Lament [[green]✓[/] Japanese, [green]✓[/] English]');
-	console_.info('Requesting: [GE00374461JAJP] Season 3 - 9 - Lament');
-	console_.info('Chapter request successful');
-
-	block(
-		tracksTree([
-			{ type: 'Video', label: '[repr.number]1[/] 428x240 (678KiB/s)' },
-			{ type: 'Video', label: '[repr.number]2[/] 640x360 (1292KiB/s)' },
-			{ type: 'Video', label: '[repr.number]3[/] 848x480 (2517KiB/s)' },
-			{ type: 'Video', label: '[repr.number]4[/] 1280x720 (4916KiB/s)' },
-			{ type: 'Video', label: '[repr.number]5[/] 1920x1080 (9286KiB/s)' },
-			{ type: 'Audio', label: '[repr.number]1[/] 104kB/s' },
-			{ type: 'Audio', label: '[repr.number]2[/] 136kB/s' },
-			{ type: 'Audio', label: '[repr.number]3[/] 200kB/s' }
-		])
-	);
+	console_.info('Majin stream available at [repr.number]11449[/] kbps (1080p+), automatically enabling Majin quality mode');
 
 	console_.info('Getting decryption keys with [cyan]widevine[/]');
 	console_.print(
@@ -55,7 +41,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 	// ── one live view for the whole episode ────────────────────────────────
 	beginSession([
-		{ key: 'video', type: 'Video', label: '1920x1080 (9286KiB/s) | vod-gcp.crunchyrollcdn.com' }
+		{ key: 'video', type: 'Video', label: '1920x1080 (11449KiB/s) | vod-gcp.crunchyrollcdn.com' }
 	]);
 	addTrack({ key: 'audio-jpn', type: 'Audio', label: '200kB/s | Japanese | vod-gcp.crunchyrollcdn.com' });
 
@@ -75,7 +61,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 	trackState('audio-jpn', 'Downloaded');
 
 	// English dub joins the same tree (video is reused, not re-downloaded)
-	console_.info('Already downloaded video, skipping video download...');
+	
 	addTrack({ key: 'audio-eng', type: 'Audio', label: '200kB/s | English | vod-cf-ap-south-1.crunchyrollcdn.com' });
 	for (let i = 1; i <= AT; i++) {
 		trackProgress('audio-eng', { completed: i, total: AT, bytes: Math.round(i * 94_600) });
@@ -94,7 +80,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 	await sleep(250);
 	trackState('audio-eng', 'Decrypted');
 
-	const subs = ['ASS | eng | English', 'ASS | eng | English Signs', 'ASS | eng | English cc'];
+	const subs = ['ASS | eng | English', 'ASS | eng | English (Signs)', 'VTT | eng | English (CC)'];
 	for (const f of subs) {
 		addTrack({ key: `sub-${f}`, type: 'Subtitle', label: f });
 		trackState(`sub-${f}`, 'Downloaded');

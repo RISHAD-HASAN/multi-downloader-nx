@@ -19,7 +19,7 @@ import * as yargs from './modules/module.app-args';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
 import { canDecrypt, getKeysPRD, getKeysWVD, cdm } from './modules/cdm';
 import { addTrack, beginSession, endSession, sessionActive, trackState, trackStateAll, type UITrack } from './modules/module.download-ui';
-import { block, tracksTree } from './modules/module.console';
+import { block, console_ as richConsole, tracksTree } from './modules/module.console';
 
 // load req
 import { domain, api } from './modules/module.api-urls';
@@ -1586,7 +1586,7 @@ export default class Crunchy implements ServiceClass {
 		let dlVideoOnce = false; // Variable to save if best selected video quality was downloaded
 
 		for (const mMeta of medias.data) {
-			console.info(`Requesting: [${mMeta.mediaId}] ${mediaName}`);
+			console.debug(`Requesting: [${mMeta.mediaId}] ${mediaName}`);
 
 			// Make sure we have a media id without a : in it
 			const currentMediaId = mMeta.mediaId.includes(':') ? mMeta.mediaId.split(':')[1] : mMeta.mediaId;
@@ -1634,7 +1634,7 @@ export default class Crunchy implements ServiceClass {
 					if (!oldChapterRequest.ok || !oldChapterRequest.res) {
 						console.warn('Old Chapter API request failed');
 					} else {
-						console.info('Old Chapter request successful');
+						console.debug('Old Chapter request successful');
 						const chapterData = (await oldChapterRequest.res.json()) as CrunchyOldChapter;
 
 						//Generate Timestamps
@@ -1658,7 +1658,7 @@ export default class Crunchy implements ServiceClass {
 					}
 				} else {
 					//Chapter request succeeded, now let's parse them
-					console.info('Chapter request successful');
+					console.debug('Chapter request successful');
 					const chapterData = (await chapterRequest.res.json()) as CrunchyChapters;
 					const chapters: CrunchyChapter[] = [];
 
@@ -2103,19 +2103,19 @@ export default class Crunchy implements ServiceClass {
 					}
 					dlFailed = true;
 				}
-				console.info('Selecting raw stream');
+				console.debug('Selecting raw stream');
 			}
 
 			let vcurStream: undefined | (typeof vstreams)[0] = undefined;
 			let acurStream: undefined | (typeof astreams)[0] = undefined;
 
 			if (!dlFailed) {
-				console.info('Downloading...');
+				console.debug('Downloading...');
 				vcurStream = vstreams[0];
 				acurStream = astreams[0];
 
-				console.info('Video Playlists URL: %s (%s)', vcurStream.url, vcurStream.type);
-				console.info('Audio Playlists URL: %s (%s)', acurStream.url, acurStream.type);
+				console.debug('Video Playlists URL: %s (%s)', vcurStream.url, vcurStream.type);
+				console.debug('Audio Playlists URL: %s (%s)', acurStream.url, acurStream.type);
 			}
 
 			let tsFile = undefined;
@@ -2226,7 +2226,7 @@ export default class Crunchy implements ServiceClass {
 							...videos.map((a, ind) => ({ type: 'Video' as const, label: `[repr.number]${ind + 1}[/] ${a.resolutionText}` })),
 							...audios.map((a, ind) => ({ type: 'Audio' as const, label: `[repr.number]${ind + 1}[/] ${a.resolutionText}` }))
 						]);
-						block(availTree);
+						if (richConsole.level === 'debug') block(availTree);
 
 						variables.push(
 							{
@@ -2271,7 +2271,7 @@ export default class Crunchy implements ServiceClass {
 								label: `${chosenAudioSegments.resolutionText} | ${lang.name} | ${aselectedServer}`
 							});
 						}
-						console.info('Stream URL:', chosenVideoSegments.segments[0].uri.split(',.urlset')[0]);
+						console.debug('Stream URL:', chosenVideoSegments.segments[0].uri.split(',.urlset')[0]);
 						// TODO check filename
 						fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
 						const outFile = parseFileName(options.fileName + '.' + (mMeta.lang?.name || lang.name), variables, options.numbers, options.override).join(path.sep);
@@ -2361,7 +2361,7 @@ export default class Crunchy implements ServiceClass {
 								return undefined;
 							}
 
-							console.info('Got decryption keys');
+							console.debug('Got decryption keys');
 						}
 
 						if (videoStream) {
@@ -2388,7 +2388,7 @@ export default class Crunchy implements ServiceClass {
 
 						// When best selected video quality is already downloaded
 						if (dlVideoOnce && options.dlVideoOnce) {
-							console.info('Already downloaded video, skipping video download...');
+							console.debug('Already downloaded video, skipping video download...');
 						} else if (options.novids) {
 							console.info('Skipping video download...');
 						} else {
@@ -2396,7 +2396,7 @@ export default class Crunchy implements ServiceClass {
 							const totalParts = chosenVideoSegments.segments.length;
 							const mathParts = Math.ceil(totalParts / options.partsize);
 							const mathMsg = `(${mathParts}*${options.partsize})`;
-							console.info('Total parts in video stream:', totalParts, mathMsg);
+							console.debug('Total parts in video stream:', totalParts, mathMsg);
 							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
 							const dirName = path.dirname(tsFile);
 							if (!fs.existsSync(dirName)) {
@@ -2442,7 +2442,7 @@ export default class Crunchy implements ServiceClass {
 							const totalParts = chosenAudioSegments.segments.length;
 							const mathParts = Math.ceil(totalParts / options.partsize);
 							const mathMsg = `(${mathParts}*${options.partsize})`;
-							console.info('Total parts in audio stream:', totalParts, mathMsg);
+							console.debug('Total parts in audio stream:', totalParts, mathMsg);
 							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
 							const dirName = path.dirname(tsFile);
 							if (!fs.existsSync(dirName)) {
@@ -2707,7 +2707,7 @@ export default class Crunchy implements ServiceClass {
 								return;
 							}
 							console.info(`Selected quality: ${Object.keys(plSelectedList).find((a) => plSelectedList[a] === selPlUrl)} @ ${plSelectedServer}`);
-							console.info('Stream URL:', selPlUrl);
+							console.debug('Stream URL:', selPlUrl);
 							// TODO check filename
 							fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
 							const outFile = parseFileName(options.fileName + '.' + (mMeta.lang?.name || lang.name), variables, options.numbers, options.override).join(path.sep);
@@ -2748,7 +2748,7 @@ export default class Crunchy implements ServiceClass {
 								const totalParts = chunkPlaylist.segments.length;
 								const mathParts = Math.ceil(totalParts / options.partsize);
 								const mathMsg = `(${mathParts}*${options.partsize})`;
-								console.info('Total parts in stream:', totalParts, mathMsg);
+								console.debug('Total parts in stream:', totalParts, mathMsg);
 								tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
 								const dirName = path.dirname(tsFile);
 								if (!fs.existsSync(dirName)) {
@@ -3113,7 +3113,7 @@ export default class Crunchy implements ServiceClass {
 								addTrack({
 									key: `sub-${sxData.file}`,
 									type: 'Subtitle',
-									label: `${sxData.path.endsWith('.ass') ? 'ASS' : 'VTT'} | ${sxData.language?.code ?? '??'} | ${sxData.title ?? sxData.file}${/\.signs\./i.test(sxData.file) ? ' (Signs)' : /\.cc\./i.test(sxData.file) ? ' (CC)' : ''}`
+									label: `${sxData.path.endsWith('.ass') ? 'ASS' : 'VTT'} | ${sxData.language?.code ?? '??'} | ${sxData.title ?? sxData.file}${isSigns ? ' (Signs)' : isCC ? ' (CC)' : ''}`
 								});
 								trackState(`sub-${sxData.file}`, 'Downloaded');
 								console.debug(`Subtitle downloaded: ${sxData.file}`);

@@ -127,10 +127,10 @@ class hlsDownload {
 
 				// Only resume download if data is not older than 24 hours
 				if (age < 24 * 60 * 60 * 1000) {
-					console.info('Resume data found! Trying to resume...');
+					console.debug('Resume data found! Trying to resume...');
 					const resumeData = JSON.parse(await fs.readFile(`${fn}.resume`, 'utf-8'));
 					if (resumeData.total == this.data.m3u8json.segments?.length && resumeData.completed != resumeData.total && !isNaN(resumeData.completed)) {
-						console.info('Resume data is ok!');
+						console.debug('Resume data is ok!');
 						this.data.offset = resumeData.completed;
 						this.data.isResume = true;
 					} else {
@@ -159,7 +159,7 @@ class hlsDownload {
 			let rwts = this.data.override ?? (await Helper.question(`[Q] File «${fn}» already exists! Rewrite? ([y]es/[N]o/[c]ontinue)`));
 			rwts = rwts || 'N';
 			if (['Y', 'y'].includes(rwts[0])) {
-				console.info(`Deleting «${fn}»...`);
+				console.debug(`Deleting «${fn}»...`);
 				await fs.unlink(fn);
 			} else if (['C', 'c'].includes(rwts[0])) {
 				return { ok: true, parts: this.data.parts };
@@ -169,16 +169,16 @@ class hlsDownload {
 		}
 		// show output filename
 		if (fsp.existsSync(fn) && this.data.isResume) {
-			console.info(`Adding content to «${fn}»...`);
+			console.debug(`Adding content to «${fn}»...`);
 		} else {
-			console.info(`Saving stream to «${fn}»...`);
+			console.debug(`Saving stream to «${fn}»...`);
 		}
 		// start time
 		this.data.dateStart = Date.now();
 		let segments = this.data.m3u8json.segments;
 		// download init part
 		if (segments?.[0].map && this.data.offset === 0 && !this.data.skipInit) {
-			console.info('Download and save init part...');
+			console.debug('Download and save init part...');
 			const initSeg = segments[0].map as Segment;
 			if (segments[0].key) {
 				initSeg.key = segments[0].key as Key;
@@ -193,7 +193,7 @@ class hlsDownload {
 						total: this.data.m3u8json.segments?.length
 					})
 				);
-				console.info('Init part downloaded.');
+				console.debug('Init part downloaded.');
 			} catch (e: any) {
 				console.error(`Part init download error:\n\t${e.message}`);
 				return { ok: false, parts: this.data.parts };
@@ -204,7 +204,7 @@ class hlsDownload {
 		// resuming ...
 		if (this.data.offset > 0) {
 			segments = segments?.slice(this.data.offset);
-			console.info(`Resuming download from part ${this.data.offset + 1}...`);
+			console.debug(`Resuming download from part ${this.data.offset + 1}...`);
 			this.data.parts.completed = this.data.offset;
 		}
 		// dl process

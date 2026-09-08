@@ -93,7 +93,7 @@ export class Req {
 
 		try {
 			const res = await fetch(durl, { ...options, dispatcher });
-			if (!res.ok) {
+			if (!res.ok && !params.silent) {
 				console.error(`${res.status}: ${res.statusText}`);
 				const body = await res.text();
 				const docTitle = body.match(/<title>(.*)<\/title>/);
