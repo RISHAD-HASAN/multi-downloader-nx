@@ -141,7 +141,20 @@ pnpm preview:cli            # regenerate cli-preview.html
 - Wrapping width + hanging indent
 - CJK-aware width measurement (Japanese titles)
 
-### Regression fixed during verification
+### Regressions fixed during verification
+
+**Packaged builds silently lost the key vault.** `modules/build.ts` copies config
+files into the build output individually, and `config/vaults.yml` was not on that
+list — so every `build-windows-*-cli` binary would start with vaults disabled and
+no error. Fixed by shipping `vaults.yml`, plus `loadVaultCfg()` now falls back to
+a local SQLite vault when the file is absent. `tests/build.test.ts` fails if any
+shipped config file is ever dropped from the copy list again.
+
+Also verified that `require('node:sqlite')` survives esbuild bundling + minify
+(pkg targets `node24`, which has it), and that the vault reads/writes correctly
+from inside a bundled binary with a devine-compatible schema.
+
+
 
 The original logger was log4js, which applies `util.format`. The first version of
 the rich console joined arguments with a space instead, so 29 call sites like

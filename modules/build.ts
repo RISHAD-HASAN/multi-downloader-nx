@@ -86,6 +86,7 @@ async function buildBinary(buildType: BuildTypes, gui: boolean) {
 	fs.copyFileSync('./config/cli-defaults.yml', `${buildDir}/config/cli-defaults.yml`);
 	fs.copyFileSync('./config/dir-path.yml', `${buildDir}/config/dir-path.yml`);
 	fs.copyFileSync('./config/gui.yml', `${buildDir}/config/gui.yml`);
+	fs.copyFileSync('./config/vaults.yml', `${buildDir}/config/vaults.yml`);
 	fs.copyFileSync('./modules/cmd-here.bat', `${buildDir}/cmd-here.bat`);
 	fs.copyFileSync('./modules/NotoSans-Regular.ttf', `${buildDir}/NotoSans-Regular.ttf`);
 	fs.copyFileSync('./package.json', `${buildDir}/package.json`);
