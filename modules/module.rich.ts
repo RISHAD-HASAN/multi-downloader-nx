@@ -10,6 +10,10 @@
  *   (unshackle/core/console.py, unshackle/core/themes.py)
  */
 
+import { format as nodeFormat, inspect as nodeInspectRaw } from 'util';
+
+const nodeInspect = (v: unknown) => nodeInspectRaw(v, { depth: 4, colors: false, breakLength: 120 });
+
 /* ────────────────────────────────────────────────────────────── palettes ── */
 
 export type Palette = Record<string, string>;
@@ -1219,6 +1223,21 @@ export class Live {
 
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 
+/**
+ * Reproduce log4js/`util.format` argument handling so existing call sites such
+ * as `console.info('Your Country: %s', country)` keep substituting correctly.
+ * Errors render as their stack, matching the previous logger.
+ */
+export function formatArgs(args: any[]): string {
+	if (args.length === 0) return '';
+	const mapped = args.map((a) => (a instanceof Error ? a.stack || a.message : a));
+	if (typeof mapped[0] === 'string') {
+		return nodeFormat(mapped[0], ...mapped.slice(1));
+	}
+	return mapped.map((a) => (typeof a === 'string' ? a : nodeInspect(a))).join(' ');
+}
+
+
 export interface RichConsoleOptions {
 	width?: number;
 	forceTerminal?: boolean;
@@ -1329,17 +1348,9 @@ export class RichConsole {
 		const order: LogLevel[] = ['debug', 'info', 'warning', 'error', 'critical'];
 		if (order.indexOf(level) < order.indexOf(this.level)) return;
 
-		const message = args
-			.map((a) => {
-				if (typeof a === 'string') return a;
-				if (a instanceof Error) return a.stack || a.message;
-				try {
-					return JSON.stringify(a, null, 2);
-				} catch {
-					return String(a);
-				}
-			})
-			.join(' ');
+		// log4js applied util.format semantics, so `console.info('Country: %s', c)`
+		// must keep working across the ~500 existing call sites.
+		const message = formatArgs(args);
 
 		for (const sink of this.sinks) sink(level, stripMarkup(message));
 		if (this.quiet) return;

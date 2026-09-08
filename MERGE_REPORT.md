@@ -121,7 +121,7 @@ Fork network surveyed: 136 forks, 15 genuinely ahead of upstream.
 
 ```bash
 pnpm exec tsc --noEmit      # clean — 0 errors
-pnpm test:vault             # vault + PSSH parsing suite
+pnpm test:all               # vault + console suites
 pnpm preview:cli            # regenerate cli-preview.html
 ```
 
@@ -131,6 +131,22 @@ pnpm preview:cli            # regenerate cli-preview.html
 - SQLite vault round-trip (auto-skips below Node 22.5)
 - `resolveKeys` — licence fetched once, second run fully vault-served
 - `enabled: false` correctly bypasses the cache
+
+`tests/console.test.ts` covers the log4js-compatibility surface:
+- `util.format` substitution (`%s`, `%d`, `%i`, multi-arg, objects)
+- Error objects rendering with level label + stack
+- Log level filtering
+- Markup applied for known tags, while `[INFO]` / `[Crunchyroll]` / `[1080p]` stay literal
+- `--noColor` producing byte-clean plain text
+- Wrapping width + hanging indent
+- CJK-aware width measurement (Japanese titles)
+
+### Regression fixed during verification
+
+The original logger was log4js, which applies `util.format`. The first version of
+the rich console joined arguments with a space instead, so 29 call sites like
+`console.info('Your Country: %s', country)` printed a literal `%s`. `RichConsole`
+now formats through `util.format`; covered by `tests/console.test.ts`.
 
 Smoke-tested live: `--help`, banner rendering in all themes, and
 `--url https://www.crunchyroll.com/series/GY5P48XEY/...` resolving against the
