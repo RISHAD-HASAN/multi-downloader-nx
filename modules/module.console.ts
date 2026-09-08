@@ -174,6 +174,19 @@ export class DownloadTable {
 		return this;
 	}
 
+	/** Register a track after the view is already live (extra dubs, subtitles). */
+	addTrack(track: TrackLike & { key: string }) {
+		if (this.taskByKey.has(track.key)) return;
+		this.tracks.push(track);
+		this.taskByKey.set(track.key, this.progress.addTask(track.label, { downloaded: '-' }, null));
+		this.rebuild();
+		this.live?.update(new Padding(this.table, [1, 5]));
+	}
+
+	has(key: string): boolean {
+		return this.taskByKey.has(key);
+	}
+
 	update(key: string, patch: { completed?: number; total?: number | null; downloaded?: string; advance?: number }) {
 		const id = this.taskByKey.get(key);
 		if (id === undefined) return;

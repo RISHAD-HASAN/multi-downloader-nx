@@ -76,14 +76,17 @@ const root = path.join(__dirname, '..');
 	const cr = fs.readFileSync(path.join(root, 'crunchy.ts'), 'utf8');
 	assert.ok(cr.includes('beginSession(uiTracks)'), 'crunchy.ts does not open the live download view');
 	assert.ok(cr.includes("trackKey: 'video'"), "crunchy.ts does not tag the video stream");
-	assert.ok(cr.includes("trackKey: 'audio'"), "crunchy.ts does not tag the audio stream");
+	assert.ok(cr.includes('trackKey: audioTrackKey'), 'crunchy.ts does not tag the audio stream per language');
 	assert.ok(cr.includes('endSession();'), 'crunchy.ts never closes the live view');
 	assert.ok(cr.includes('tracksTree('), 'crunchy.ts no longer renders the available-tracks tree');
-	// the live region must be torn down before the decrypters write to stdout
+	// Subprocess output is captured now, so the live view spans decryption and
+	// only closes once every stream is finished.
 	const endIdx = cr.indexOf('endSession();');
-	const decIdx = cr.indexOf('Decryption Needed, attempting to decrypt');
-	assert.ok(endIdx > 0 && decIdx > 0 && endIdx < decIdx, 'live view must close BEFORE decryption writes to stdout');
-	console.log('✓ crunchy.ts opens/closes the session and closes it before decryption');
+	const decIdx = cr.indexOf("trackState('video', 'Decrypting')");
+	assert.ok(decIdx > 0, 'crunchy.ts does not report Decrypting');
+	assert.ok(endIdx > decIdx, 'live view must stay open through decryption');
+	assert.ok(cr.includes("type: 'Subtitle'"), 'subtitles are not added to the tree');
+	console.log('✓ crunchy.ts keeps the view open through decryption, adds subtitle rows');
 }
 
 console.log('\nAll download-UI tests passed.');

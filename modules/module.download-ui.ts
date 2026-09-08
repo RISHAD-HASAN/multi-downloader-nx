@@ -25,7 +25,7 @@ export interface UITrack {
 }
 
 /** Terminal states shown in place of the transferred amount. */
-export type TrackState = 'Downloaded' | 'Decrypted' | 'Muxed' | 'SKIPPED' | 'FAILED';
+export type TrackState = 'Downloaded' | 'Decrypting' | 'Decrypted' | 'Muxing' | 'Muxed' | 'SKIPPED' | 'FAILED';
 
 interface TrackRuntime {
 	completed: number;
@@ -68,6 +68,22 @@ class DownloadSession {
 		return this.runtime.has(key);
 	}
 
+	/** Register a track once the view is already on screen. */
+	add(track: UITrack) {
+		if (this.runtime.has(track.key)) return;
+		this.tracks.push(track);
+		this.runtime.set(track.key, {
+			completed: 0,
+			total: null,
+			bytes: 0,
+			startedAt: Date.now(),
+			lastBytes: 0,
+			lastAt: Date.now(),
+			speed: 0
+		});
+		this.table.addTrack({ key: track.key, type: track.type, label: track.label });
+	}
+
 	/** Report progress for one track. Safe to call very frequently. */
 	progress(key: string, patch: { completed?: number; total?: number | null; bytes?: number }) {
 		const rt = this.runtime.get(key);
@@ -107,11 +123,21 @@ class DownloadSession {
 		const rt = this.runtime.get(key);
 		if (!rt || this.stopped) return;
 		rt.state = state;
+		const inProgress = state === 'Decrypting' || state === 'Muxing';
 		const styled =
-			state === 'FAILED' ? '[red]FAILED[/]' : state === 'SKIPPED' ? '[yellow]SKIPPED[/]' : `[green]${state}[/]`;
+			state === 'FAILED'
+				? '[red]FAILED[/]'
+				: state === 'SKIPPED'
+					? '[yellow]SKIPPED[/]'
+					: inProgress
+						? `[yellow]${state}[/]`
+						: `[green]${state}[/]`;
+		// Tracks that never reported a total (subtitles, chapters) still need a
+		// full bar rather than an idle pulse once they reach a terminal state.
+		const total = rt.total && rt.total > 0 ? rt.total : 1;
 		this.table.update(key, {
-			completed: rt.total ?? rt.completed,
-			total: rt.total ?? rt.completed ?? 1,
+			completed: inProgress ? Math.max(rt.completed, total) : total,
+			total,
 			downloaded: styled
 		});
 	}
@@ -151,6 +177,20 @@ export function trackProgress(key: string, patch: { completed?: number; total?: 
 
 export function trackState(key: string, state: TrackState): void {
 	current?.state(key, state);
+}
+
+/** Add a track to the running session (2nd dub, subtitles, ...). */
+export function addTrack(track: UITrack): void {
+	current?.add(track);
+}
+
+/** Mark every track still in flight with a terminal state. */
+export function trackStateAll(state: TrackState, only?: UITrackType): void {
+	if (!current) return;
+	for (const t of current.tracks) {
+		if (only && t.type !== only) continue;
+		current.state(t.key, state);
+	}
 }
 
 export function endSession(): void {

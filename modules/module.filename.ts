@@ -3,9 +3,18 @@ import { AvailableFilenameVars } from './module.args';
 import { console } from './log';
 import Helper from './module.helper';
 
-// Utility function to replace whitespace with dots
+/**
+ * Scene-style naming: collapse whitespace and punctuation into dots.
+ * Handles spaces, commas, colons (incl. the full-width U+FF1A that Windows
+ * substitutes), semicolons, question/exclamation marks, quotes, brackets and
+ * dashes, then squeezes repeats and trims stray dots.
+ */
 const replaceWhitespaceWithDots = (input: string): string => {
-  return input.replace(/\s+/g, '.'); // Replaces all whitespaces with dots
+	return input
+		.replace(/\s+/g, '.')
+		.replace(/[,;:\uFF1A\uFF0C\u2013\u2014\-!?'"“”‘’`(){}[\]<>|~^&+=@#$%]/g, '.')
+		.replace(/\.{2,}/g, '.')
+		.replace(/^\.+|\.+$/g, '');
 };
 
 // Utility function to remove underscores

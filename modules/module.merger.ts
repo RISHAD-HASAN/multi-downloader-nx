@@ -6,6 +6,7 @@ import fsp from 'fs/promises';
 import { LanguageItem } from './module.langsData';
 import { AvailableMuxer } from './module.args';
 import { console } from './log';
+import { Padding } from './module.rich';
 import Helper from './module.helper';
 import { convertChaptersToFFmpegFormat } from './module.ffmpegChapter';
 import { mediaInfoFactory } from 'mediainfo.js';
@@ -444,16 +445,19 @@ class Merger {
 			console.warn('Unable to merge files.');
 			return;
 		}
-		console.info(`[${type}] Started merging`);
+		console.debug(`[${type}] Started merging`);
 		const res = Helper.exec(type, `"${bin}"`, command);
 		if (!res.isOk && type === 'mkvmerge' && res.err.code === 1) {
-			console.info(`[${type}] Mkvmerge finished with at least one warning`);
+			console.warn(`[${type}] finished with at least one warning`);
 		} else if (!res.isOk) {
 			console.error(res.err);
 			console.error(`[${type}] Merging failed with exit code ${res.err.code}`);
+			return;
 		} else {
-			console.info(`[${type} Done]`);
+			console.debug(`[${type} Done]`);
 		}
+		// Final, single line the user actually cares about
+		console.print(new Padding(`[green]${this.options.output}[/] [text2]done[/]`, [1, 5, 1, 5]));
 	}
 
 	public cleanUp() {

@@ -141,6 +141,30 @@ pnpm preview:cli            # regenerate cli-preview.html
 - Wrapping width + hanging indent
 - CJK-aware width measurement (Japanese titles)
 
+### Output/UX pass
+
+- **Subprocess output is captured, not inherited.** `Helper.exec` used
+  `stdio: 'inherit'`, so shaka-packager and mkvmerge wrote directly to the
+  terminal. It now pipes and only replays output on failure or under `--debug`.
+  That is what allows the live view to stay on screen through decryption.
+- **One live tree per episode.** The session opens once and extra dubs and
+  subtitles are appended to it (`addTrack`), so a second audio lands under
+  `2 Audio` and subs under `Subtitles` instead of starting a new tree.
+- **In-place state transitions** — each row moves `Downloading -> Decrypting ->
+  Decrypted` next to its own bar. Tracks with no byte total (subtitles) still
+  render a completed bar on reaching a terminal state.
+- **Quiet finish** — the mux prints a single `<path> done` line.
+- **Filename dots** — whitespace *and* punctuation (`, ; : ? ! - ' " ( ) [ ]`
+  and the full-width `U+FF1A` colon Windows produces) collapse to dots, with
+  duplicate and edge dots squeezed.
+
+**Not done: overlapping transfers.** Video/audio/second-dub still download one
+after another. `downloadMediaList` iterates versions sequentially across ~900
+lines, and running three streams at once multiplies concurrent CDN connections
+at a point where `--partsize` alone already triggered `ECONNRESET` throttling.
+The single-tree view makes the sequencing far less visible; genuine parallelism
+is a separate refactor.
+
 ### Regressions fixed during verification
 
 **`--majin` was a flag with no implementation.** The option was merged into

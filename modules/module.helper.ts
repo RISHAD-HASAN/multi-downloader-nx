@@ -2,7 +2,11 @@
 import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
 import childProcess from 'child_process';
+import { console_ as richConsole } from './module.console';
 import { console } from './log';
+
+/** Subprocess output is hidden unless the user asked for --debug. */
+const quietDefault = () => richConsole.level !== 'debug' && process.env.isGUI !== 'true';
 
 export default class Helper {
 	static async question(q: string) {
@@ -61,17 +65,37 @@ export default class Helper {
 				err: Error & { code: number };
 		  } {
 		pargs = pargs ? ' ' + pargs : '';
-		console.info(`\n> "${pname}"${pargs}${spc ? '\n' : ''}`);
+		// `quiet` keeps shaka-packager / mkvmerge chatter off the terminal so the
+		// live download view can stay on screen. Output is still captured and is
+		// replayed on failure (or when --debug is set).
+		const quiet = quietDefault();
+		if (quiet) {
+			console.debug(`> "${pname}"${pargs}`);
+		} else {
+			console.info(`\n> "${pname}"${pargs}${spc ? '\n' : ''}`);
+		}
 		try {
+			const stdio = quiet ? 'pipe' : 'inherit';
+			let out: Buffer | string | undefined;
 			if (process.platform === 'win32') {
-				childProcess.execSync('& ' + fpath + pargs, { stdio: 'inherit', shell: 'powershell.exe', windowsHide: true });
+				out = childProcess.execSync('& ' + fpath + pargs, { stdio, shell: 'powershell.exe', windowsHide: true });
 			} else {
-				childProcess.execSync(fpath + pargs, { stdio: 'inherit' });
+				out = childProcess.execSync(fpath + pargs, { stdio });
+			}
+			if (quiet && out) {
+				const text = out.toString().trim();
+				if (text) console.debug(text);
 			}
 			return {
 				isOk: true
 			};
 		} catch (er) {
+			if (quiet) {
+				// the failure output was swallowed - surface it now
+				const e = er as { stdout?: Buffer; stderr?: Buffer };
+				const dump = [e.stdout?.toString(), e.stderr?.toString()].filter(Boolean).join('\n').trim();
+				if (dump) console.error(dump);
+			}
 			const err = er as Error & { status: number };
 			return {
 				isOk: false,

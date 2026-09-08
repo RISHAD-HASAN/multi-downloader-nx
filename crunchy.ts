@@ -18,7 +18,7 @@ import * as yamlCfg from './modules/module.cfg-loader';
 import * as yargs from './modules/module.app-args';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
 import { canDecrypt, getKeysPRD, getKeysWVD, cdm } from './modules/cdm';
-import { beginSession, endSession, trackState, type UITrack } from './modules/module.download-ui';
+import { addTrack, beginSession, endSession, sessionActive, trackState, trackStateAll, type UITrack } from './modules/module.download-ui';
 import { block, tracksTree } from './modules/module.console';
 
 // load req
@@ -2246,27 +2246,31 @@ export default class Crunchy implements ServiceClass {
 							console.error(`Unable to find language for code ${acurStream.audio_lang}`);
 							return;
 						}
-						console.info(
+						console.debug(
 							`Selected quality: \n\tVideo: ${chosenVideoSegments.resolutionText}\n\tAudio: ${chosenAudioSegments.resolutionText}\n\tVideo Server: ${vselectedServer}\n\tAudio Server: ${aselectedServer}`
 						);
 
-						// Open the live download view (unshackle-style track tree + bars)
-						const uiTracks: UITrack[] = [];
-						if (!options.novids) {
-							uiTracks.push({
-								key: 'video',
-								type: 'Video',
-								label: `${chosenVideoSegments.resolutionText} | ${vselectedServer}`
-							});
+						// One live view per episode; extra dubs and subtitles are appended to
+						// the same tree as they are discovered.
+						const audioTrackKey = `audio-${lang.code}`;
+						if (!sessionActive()) {
+							const uiTracks: UITrack[] = [];
+							if (!options.novids) {
+								uiTracks.push({
+									key: 'video',
+									type: 'Video',
+									label: `${chosenVideoSegments.resolutionText} | ${vselectedServer}`
+								});
+							}
+							beginSession(uiTracks);
 						}
 						if (chosenAudioSegments && !options.noaudio) {
-							uiTracks.push({
-								key: 'audio',
+							addTrack({
+								key: audioTrackKey,
 								type: 'Audio',
 								label: `${chosenAudioSegments.resolutionText} | ${lang.name} | ${aselectedServer}`
 							});
 						}
-						beginSession(uiTracks);
 						console.info('Stream URL:', chosenVideoSegments.segments[0].uri.split(',.urlset')[0]);
 						// TODO check filename
 						fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
@@ -2448,7 +2452,7 @@ export default class Crunchy implements ServiceClass {
 								segments: chosenAudioSegments.segments
 							};
 							const audioDownload = await new streamdl({
-								trackKey: 'audio',
+								trackKey: audioTrackKey,
 								output: chosenVideoSegments.pssh_wvd || chosenVideoSegments.pssh_prd ? `${tempTsFile}.audio.enc.m4s` : `${tsFile}.audio.m4s`,
 								timeout: options.timeout,
 								m3u8json: audioJson,
@@ -2469,20 +2473,16 @@ export default class Crunchy implements ServiceClass {
 									: undefined
 							}).download();
 							if (!audioDownload.ok) {
-								trackState('audio', 'FAILED');
+								trackState(audioTrackKey, 'FAILED');
 								console.error(`DL Stats: ${JSON.stringify(audioDownload.parts)}\n`);
 								dlFailed = true;
 							} else {
-								trackState('audio', 'Downloaded');
+								trackState(audioTrackKey, 'Downloaded');
 							}
 							audioDownloaded = true;
 						} else if (options.noaudio) {
 							console.info('Skipping audio download...');
 						}
-
-						// Close the live view: the decrypters write straight to stdout and
-						// would otherwise fight the Live region for the same lines.
-						endSession();
 
 						//Handle Decryption if needed
 						if (
@@ -2490,7 +2490,7 @@ export default class Crunchy implements ServiceClass {
 							(videoDownloaded || audioDownloaded) &&
 							!dlFailed
 						) {
-							console.info('Decryption Needed, attempting to decrypt');
+							console.debug('Decryption Needed, attempting to decrypt');
 							if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
 								let commandBaseVideo = `--show-progress ${encryptionKeysVideo?.map((kb) => `--key ${kb.kid}:${kb.key}`).join(' ')} `;
 								let commandBaseAudio = `--show-progress ${encryptionKeysAudio?.map((kb) => `--key ${kb.kid}:${kb.key}`).join(' ')} `;
@@ -2505,7 +2505,8 @@ export default class Crunchy implements ServiceClass {
 								}
 
 								if (videoDownloaded) {
-									console.info('Started decrypting video,', this.cfg.bin.shaka ? 'using shaka' : 'using mp4decrypt');
+									trackState('video', 'Decrypting');
+									console.debug(`Started decrypting video, using ${this.cfg.bin.shaka ? 'shaka' : 'mp4decrypt'}`);
 									const decryptVideo = Helper.exec(
 										this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt',
 										this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`,
@@ -2520,7 +2521,8 @@ export default class Crunchy implements ServiceClass {
 										fs.renameSync(`${tempTsFile}.video.enc.m4s`, `${tsFile}.video.enc.m4s`);
 										return undefined;
 									} else {
-										console.info('Decryption done for video');
+										trackState('video', 'Decrypted');
+										console.debug('Decryption done for video');
 										if (!options.nocleanup) {
 											fs.unlinkSync(`${tempTsFile}.video.enc.m4s`);
 										}
@@ -2536,7 +2538,8 @@ export default class Crunchy implements ServiceClass {
 								}
 
 								if (audioDownloaded) {
-									console.info('Started decrypting audio,', this.cfg.bin.shaka ? 'using shaka' : 'using mp4decrypt');
+									trackState(audioTrackKey, 'Decrypting');
+									console.debug(`Started decrypting audio, using ${this.cfg.bin.shaka ? 'shaka' : 'mp4decrypt'}`);
 									const decryptAudio = Helper.exec(
 										this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt',
 										this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`,
@@ -2562,7 +2565,8 @@ export default class Crunchy implements ServiceClass {
 											lang: lang,
 											isPrimary: isPrimary
 										});
-										console.info('Decryption done for audio');
+										trackState(audioTrackKey, 'Decrypted');
+										console.debug('Decryption done for audio');
 									}
 								}
 							} else {
@@ -3106,7 +3110,9 @@ export default class Crunchy implements ServiceClass {
 									sxData.fonts = fontsData.assFonts(sBody) as Font[];
 								}
 								fs.writeFileSync(sxData.path, sBody);
-								console.info(`Subtitle downloaded: ${sxData.file}`);
+								addTrack({ key: `sub-${sxData.file}`, type: 'Subtitle', label: sxData.file });
+								trackState(`sub-${sxData.file}`, 'Downloaded');
+								console.debug(`Subtitle downloaded: ${sxData.file}`);
 								files.push({
 									type: 'Subtitle',
 									...(sxData as sxItem),
@@ -3129,7 +3135,8 @@ export default class Crunchy implements ServiceClass {
 
 			await this.sleep(options.waittime);
 		}
-		console.info('\x1b[32m[MDNX] All stream downloads & decryption completed.\x1b[0m');
+		endSession();
+		console.info('[green][MDNX] All stream downloads & decryption completed.[/]');
 
 		let finalOutBase = './unknown';
 		if (fileName) {
