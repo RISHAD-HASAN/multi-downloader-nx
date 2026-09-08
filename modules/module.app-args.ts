@@ -68,6 +68,7 @@ export let argvC: {
 	mp4: boolean;
 	skipmux: boolean | undefined;
 	fileName: string;
+	outputDir: string;
 	numbers: number;
 	nosess: string;
 	debug: boolean | undefined;
@@ -99,6 +100,8 @@ export let argvC: {
 	// Proxy
 	proxy: string;
 	proxyAll: boolean;
+  //handling signs subtitles
+	signSubsForced: 'yes' | 'default' | 'no';
 };
 
 export type ArgvType = typeof argvC;

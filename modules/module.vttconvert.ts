@@ -1,3 +1,7 @@
+//For ScaledBorderAndShadow input
+import { appArgv } from './module.app-args';
+const argv = appArgv({});
+
 // vtt loader
 export type Record = {
 	text?: string;
@@ -49,14 +53,15 @@ function loadVtt(vttStr: string) {
 
 // ass specific
 function convertToAss(vttStr: string, lang: string, fontSize: number, fontName?: string) {
+	const scaledSetting = argv.scaledBorderAndShadow; // get value from CLI args
 	let ass = [
 		'\ufeff[Script Info]',
 		`Title: ${lang}`,
 		'ScriptType: v4.00+',
-		'PlayResX: 1280',
-		'PlayResY: 720',
+		'PlayResX: 640',
+		'PlayResY: 360',
 		'WrapStyle: 0',
-		'ScaledBorderAndShadow: yes',
+		`ScaledBorderAndShadow: ${scaledSetting}`,
 		'',
 		'[V4+ Styles]',
 		'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, ' +

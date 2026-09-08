@@ -10,6 +10,10 @@ import Helper from './module.helper';
 import { convertChaptersToFFmpegFormat } from './module.ffmpegChapter';
 import { mediaInfoFactory } from 'mediainfo.js';
 
+//For signSubsForced input
+import { appArgv } from './module.app-args';
+const argv = appArgv({});
+
 export type MergerInput = {
 	path: string;
 	lang: LanguageItem;
@@ -48,6 +52,7 @@ export type MergerOptions = {
 	keepAllVideos?: boolean;
 	fonts?: ParsedFont[];
 	skipSubMux?: boolean;
+	signSubsForced?: argv.signSubsForced;
 	options: {
 		ffmpeg: string[];
 		mkvmerge: string[];
@@ -60,6 +65,8 @@ export type MergerOptions = {
 
 class Merger {
 	constructor(private options: MergerOptions) {
+		//this.options.signSubsForced ??= 'no'; // Default to 'no' if undefined.	
+		this.options.signSubsForced = argv.signSubsForced;
 		if (this.options.skipSubMux) this.options.subtitles = [];
 		if (this.options.videoTitle) this.options.videoTitle = this.options.videoTitle.replace(/"/g, "'");
 	}
@@ -118,7 +125,6 @@ class Merger {
 			}
 		}
 	}
-
 	public FFmpeg(): string {
 		const args: string[] = [];
 		const metaData: string[] = [];
@@ -228,7 +234,8 @@ class Merger {
 		for (const vid of this.options.onlyVid) {
 			if (!hasVideo || this.options.keepAllVideos) {
 				args.push('--video-tracks 0', '--no-audio');
-				const trackName = (this.options.videoTitle ?? vid.lang.name) + (this.options.simul ? ' [Simulcast]' : ' [Uncut]');
+				//const trackName = (this.options.videoTitle ?? vid.lang.name) + (this.options.simul ? ' [Simulcast]' : ' [Uncut]');
+				const trackName = (this.options.videoTitle ?? vid.lang.name);
 				args.push('--track-name', `0:"${trackName}"`);
 				args.push(`--language 0:${vid.lang.code}`);
 				hasVideo = true;
@@ -244,7 +251,8 @@ class Merger {
 			}
 			if (!hasVideo || this.options.keepAllVideos) {
 				args.push(`--video-tracks ${videoTrackNum}`, `--audio-tracks ${audioTrackNum}`);
-				const trackName = (this.options.videoTitle ?? vid.lang.name) + (this.options.simul ? ' [Simulcast]' : ' [Uncut]');
+				//const trackName = (this.options.videoTitle ?? vid.lang.name) + (this.options.simul ? ' [Simulcast]' : ' [Uncut]');
+				const trackName = (this.options.videoTitle ?? vid.lang.name);
 				args.push('--track-name', `0:"${trackName}"`);
 				//args.push('--track-name', `1:"${trackName}"`);
 				args.push(`--language ${audioTrackNum}:${vid.lang.code}`);
@@ -281,7 +289,16 @@ class Merger {
 		}
 
 		if (this.options.subtitles.length > 0) {
-			for (const subObj of this.options.subtitles) {
+			// Sort subtitles: normal → signs → CC
+			const sortedSubs = [...this.options.subtitles].sort((a, b) => {
+				const getPriority = (s: any) => {
+					if (s.closedCaption) return 2; // CC last
+					if (s.signs) return 1;         // Signs second
+					return 0;                      // Regular first
+				};
+				return getPriority(a) - getPriority(b);
+			});
+			for (const subObj of sortedSubs) {
 				if (subObj.delay) {
 					args.push(`--sync 0:-${Math.ceil(subObj.delay * 1000)}`);
 				}
@@ -290,12 +307,32 @@ class Merger {
 					`0:"${(subObj.language.language || subObj.language.name) + `${subObj.closedCaption === true ? ` ${this.options.ccTag}` : ''}` + `${subObj.signs === true ? ' Signs' : ''}`}"`
 				);
 				args.push('--language', `0:"${subObj.language.code}"`);
-				//TODO: look into making Closed Caption default if it's the only sub of the default language downloaded
-				if (this.options.defaults.sub.code === subObj.language.code && !subObj.closedCaption) {
-					args.push('--default-track 0');
+				//console.log('signSubsForced:', options.signSubsForced)
+				// Add forced/default control for Signs subtitles
+				if (subObj.signs) {
+					switch (this.options.signSubsForced) {
+						case 'yes':
+							args.push('--default-track', '0:1');
+							args.push('--forced-track', '0:1');
+							break;
+						case 'default':
+							args.push('--default-track', '0:1');
+							args.push('--forced-track', '0:0');
+							break;
+						case 'no':
+						default:
+							args.push('--default-track', '0:0');
+							args.push('--forced-track', '0:0');
+							break;
+					}
 				} else {
-					args.push('--default-track 0:0');
-				}
+					//TODO: look into making Closed Caption default if it's the only sub of the default language downloaded
+					if (this.options.defaults.sub.code === subObj.language.code && !subObj.closedCaption) {
+						args.push('--default-track 0');
+					} else {
+						args.push('--default-track 0:0');
+					}
+				}			
 				args.push(`"${subObj.file}"`);
 			}
 		} else {

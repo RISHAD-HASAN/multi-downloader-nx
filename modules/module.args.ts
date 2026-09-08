@@ -468,7 +468,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 			default: true
 		}
 	},
-	{
+	{  
 		name: 'subtitleTimestampFix',
 		group: 'dl',
 		describe:
@@ -480,6 +480,19 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		default: {
 			default: false
 		}
+	},
+	{
+    	name: 'signSubsForced',
+    	describe: 'Set sign subs as forced/default/none',
+    	docDescribe: true,
+    	group: 'mux',
+    	service: ['all'],
+    	type: 'string',
+    	usage: '',
+		choices: ['yes', 'default', 'no'],
+    	default: {
+      		default: 'no'
+    	}
 	},
 	{
 		name: 'novids',
@@ -664,6 +677,18 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		usage: '${fileName}',
 		default: {
 			default: '[${service}] ${showTitle} - S${season}E${episode} [${height}p]'
+		}
+	},
+	{
+		name: 'outputDir',
+		group: 'fileName',
+		describe: 'Set a custom directory for the final muxed file (supports template variables). Temporary files remain in the default content folder.',
+		docDescribe: true,
+		service: ['all'],
+		type: 'string',
+		usage: '${outputDir}',
+		default: {
+			default: ''
 		}
 	},
 	{
@@ -1087,3 +1112,4 @@ const buildDefault = () => {
 };
 
 export { getDefault, buildDefault, args, groups, availableFilenameVars };
+

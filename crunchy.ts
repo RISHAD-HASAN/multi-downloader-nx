@@ -3025,10 +3025,29 @@ export default class Crunchy implements ServiceClass {
 
 			await this.sleep(options.waittime);
 		}
+		console.info('\x1b[32m[MDNX] All stream downloads & decryption completed.\x1b[0m');
+
+		let finalOutBase = './unknown';
+		if (fileName) {
+			let targetDir = this.cfg.dir.content;
+
+			if (options.outputDir) {
+				const parsedDir = parseFileName(options.outputDir, variables, options.numbers, options.override).join(path.sep);
+				targetDir = path.isAbsolute(parsedDir) ? parsedDir : path.join(this.cfg.dir.content, parsedDir);
+
+				if (!fs.existsSync(targetDir)) {
+					fs.mkdirSync(targetDir, { recursive: true });
+				}
+			}
+
+			const finalNamePart = path.isAbsolute(fileName) ? path.basename(fileName) : fileName;
+			finalOutBase = path.join(targetDir, finalNamePart);
+		}
+
 		return {
 			error: dlFailed,
 			data: files,
-			fileName: fileName ? (path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.content, fileName)) || './unknown' : './unknown'
+			fileName: finalOutBase
 		};
 	}
 
@@ -3544,3 +3563,4 @@ export default class Crunchy implements ServiceClass {
 		return episodeList;
 	}
 }
+

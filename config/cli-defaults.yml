@@ -3,21 +3,21 @@ q: 0
 # Set which server to use
 server: 1
 # How many parts to download at once. Increasing may improve download speed.
-partsize: 10
+partsize: 20
 # Set whether to mux into an mp4 or not. Not recommended.
 mp4: false
 # Whether to delete any created files or not
 nocleanup: false
 # Whether to only download the relevant video once
-dlVideoOnce: false
+dlVideoOnce: true
 # Whether to keep all downloaded videos or only a single copy
 keepAllVideos: false
 # What to use as the file name template
-fileName: '[${service}] ${showTitle} - S${season}E${episode} [${height}p]'
+fileName: "${seriesTitle}.S${season}E${episode}.${title}.${height}p.CR.WEB-DL.AAC2.0.x264"
 # What Audio languages to download
 dubLang: ['jpn']
 # What Subtitle languages to download
-dlsubs: ['all']
+dlsubs: ['en']
 # What language Audio to set as default
 defaultAudio: 'jpn'
 # Video Playback Endpoint (Crunchyroll)
@@ -26,3 +26,13 @@ vstream: 'androidtv'
 astream: 'android'
 # Total Session Death (Could kill active streaming sessions from watching users if account shared, use with caution) (Crunchyroll)
 tsd: false
+#Service - forces crunchyroll as default
+service: 'crunchy'
+#mkvmerge options (return to normal mkvmerge behaviour)
+mkvmergeOptions: [" "]
+#layoutResFix - important to set this as false, otherwise subtitle mod breaks
+layoutResFix: false
+#ScaledBorderAndShadow (Personal preference, but should be yes)
+scaledBorderAndShadow: 'no'
+#signs sub forced? (Should be always set to no)
+signSubsForced: 'no'

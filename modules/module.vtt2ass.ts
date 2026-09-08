@@ -2,17 +2,19 @@
 const cssPrefixRx = /\.rmp-container>\.rmp-content>\.rmp-cc-area>\.rmp-cc-container>\.rmp-cc-display>\.rmp-cc-cue /g;
 
 import { console } from './log';
+import { appArgv } from './module.app-args';
+const argv = appArgv({});
 
 // colors
 import colors from './module.colors.json';
 const defaultStyleName = 'Default';
-const defaultStyleFont = 'Arial';
+const defaultStyleFont = 'Trebuchet MS';
 
 // predefined
 let relGroup = '';
 let fontSize = 0;
 let tmMrg = 0;
-let rFont = '';
+let rFont = 'Trebuchet MS';
 let doCombineLines = false;
 
 type Css = Record<
@@ -39,7 +41,7 @@ function loadCSS(cssStr: string): Css {
 		.replace(/[\r\n]+/g, '\n')
 		.split('\n');
 	const defaultSFont = rFont == '' ? defaultStyleFont : rFont;
-	let defaultStyle = `${defaultSFont},40,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,1,0,2,20,20,20,1`; //base for nonDialog
+	let defaultStyle = `${defaultSFont},24,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,1,2,20,20,20,1`; //base for nonDialog
 	const styles: Record<
 		string,
 		{
@@ -81,7 +83,7 @@ function parseStyle(stylegroup: string, line: string, style: any) {
 
 	if (stylegroup.startsWith('Subtitle') || stylegroup.startsWith('Song') || stylegroup.startsWith('Q') || stylegroup.startsWith('Default')) {
 		//base for dialog, everything else use defaultStyle
-		style = `${defaultSFont},${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2.6,0,2,20,20,46,1`;
+		style = `${defaultSFont},${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,1,2,20,20,20,1`;
 	}
 
 	// Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
@@ -316,14 +318,15 @@ function pushBuffer(buffer: ReturnType<typeof convertLine>[], events: string[]) 
 
 function convert(css: Css, vtt: Vtt[]) {
 	const stylesMap: Record<string, string> = {};
+	const scaledSetting = argv.scaledBorderAndShadow; // get value from CLI args
 	let ass = [
 		'\ufeff[Script Info]',
 		'Title: ' + relGroup,
 		'ScriptType: v4.00+',
 		'WrapStyle: 0',
-		'PlayResX: 1280',
-		'PlayResY: 720',
-		'ScaledBorderAndShadow: yes',
+		'PlayResX: 640',
+		'PlayResY: 360',
+		`ScaledBorderAndShadow: ${scaledSetting}`,
 		'',
 		'[V4+ Styles]',
 		'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding'

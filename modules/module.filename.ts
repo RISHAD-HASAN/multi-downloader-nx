@@ -3,6 +3,16 @@ import { AvailableFilenameVars } from './module.args';
 import { console } from './log';
 import Helper from './module.helper';
 
+// Utility function to replace whitespace with dots
+const replaceWhitespaceWithDots = (input: string): string => {
+  return input.replace(/\s+/g, '.'); // Replaces all whitespaces with dots
+};
+
+// Utility function to remove underscores
+const removeUnderscores = (input: string): string => {
+  return input.replace(/_/g, '');
+};
+
 export type Variable<T extends string = AvailableFilenameVars> = (
 	| {
 			type: 'number';
@@ -43,6 +53,11 @@ const parseFileName = (input: string, variables: Variable[], numbers: number, ov
 			input = input.replace(type, use.replaceWith);
 		}
 	}
+	
+	  // Replace whitespace with dots in the final input
+	input = replaceWhitespaceWithDots(input);
+	input = removeUnderscores(input); //Removes Underscore
+
 	return input.split(path.sep).map((a) => Helper.cleanupFilename(a));
 };
 
