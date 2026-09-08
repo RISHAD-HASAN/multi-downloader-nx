@@ -1536,6 +1536,20 @@ export default class Crunchy implements ServiceClass {
 		}
 	}
 
+	/**
+	 * Rewrite a Crunchyroll playback URL to its "majin" variant - a separate,
+	 * higher-bitrate CENC-encrypted DASH encode.
+	 * Ported from the Yurasubs fork.
+	 */
+	private applyMajinTransform(url: string): string {
+		// Already a majin URL - never rewrite twice (/static/majin/majin/...)
+		if (url.includes('/static/majin/')) return url;
+		// Only DASH playback URLs have a majin/CENC counterpart; leave HLS and
+		// anything unrecognised untouched rather than producing a dead URL.
+		if (!/\/(?:\d+\/)?clean\/dash\//.test(url) || !url.includes('/static/')) return url;
+		return url.replace('/static/', '/static/majin/').replace(/\/(?:\d+\/)?clean\/dash\//, '/clean/cenc/dash/');
+	}
+
 	public async downloadMediaList(
 		medias: CrunchyEpMeta,
 		options: CrunchyDownloadOptions
@@ -1825,6 +1839,60 @@ export default class Crunchy implements ServiceClass {
 					subtitles: videoStream.subtitles,
 					versions: videoStream.versions
 				};
+				if (options.majin) {
+					console.info('Majin quality mode enabled, transforming video stream URLs');
+					for (const key in derivedPlaystreams) {
+						derivedPlaystreams[key].url = this.applyMajinTransform(derivedPlaystreams[key].url);
+					}
+				} else {
+					// Probe for a majin encode and switch to it when it is meaningfully
+					// better (1080p+ at >= 7500 kbps). Ported from the Yurasubs fork.
+					const rawUrl = derivedPlaystreams['']?.url || Object.values(derivedPlaystreams)[0]?.url;
+					if (rawUrl) {
+						try {
+							const majinUrl = this.applyMajinTransform(rawUrl);
+							if (majinUrl !== rawUrl) {
+								const majinReq = await this.req.getData(majinUrl, { ...AuthHeaders, silent: true });
+								if (majinReq.ok && majinReq.res) {
+									const majinBody = await majinReq.res.text();
+									if (majinBody.includes('MPD')) {
+										const parsedMajin = await parse(
+											majinBody,
+											langsData.findLang(langsData.fixLanguageTag(videoStream.audioLocale as string) || ''),
+											majinUrl.match(/.*\.urlset\//)?.[0]
+										);
+										const firstServer = Object.keys(parsedMajin)[0];
+										if (firstServer && parsedMajin[firstServer]?.video) {
+											const best = parsedMajin[firstServer].video.reduce(
+												(acc, v) => {
+													const kbps = Math.round(v.bandwidth / 1024);
+													const is1080pPlus = v.quality.height >= 1080 || v.quality.width >= 1920;
+													return is1080pPlus && kbps > acc ? kbps : acc;
+												},
+												0
+											);
+											if (best >= 7500) {
+												console.info(
+													`Majin stream available at [repr.number]${best}[/] kbps (1080p+), automatically enabling Majin quality mode`
+												);
+												options.majin = true;
+												for (const key in derivedPlaystreams) {
+													derivedPlaystreams[key].url = this.applyMajinTransform(derivedPlaystreams[key].url);
+												}
+											} else if (best > 0) {
+												console.debug(`Majin stream found at ${best} kbps, below the 7500 kbps threshold - keeping the standard encode`);
+											}
+										}
+									}
+								} else {
+									console.debug('No majin encode available for this title');
+								}
+							}
+						} catch (e) {
+							console.debug(`Majin probe failed, continuing with the standard encode: ${(e as Error).message}`);
+						}
+					}
+				}
 				pbData.vpb[`adaptive_${options.vstream}_${videoStream.url.includes('m3u8') ? 'hls' : 'dash'}_drm`] = {
 					...derivedPlaystreams
 				};
@@ -2128,7 +2196,7 @@ export default class Crunchy implements ServiceClass {
 						});
 
 						videos.sort((a, b) => {
-							return a.quality.width - b.quality.width;
+							return a.quality.width - b.quality.width || a.bandwidth - b.bandwidth;
 						});
 
 						audios.sort((a, b) => {

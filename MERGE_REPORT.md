@@ -100,7 +100,7 @@ Fork network surveyed: 136 forks, 15 genuinely ahead of upstream.
 | **xNabil/multi-downloader-nx** | `--outputDir` — separate temp download dir from final output dir ([#1221](https://github.com/anidl/multi-downloader-nx/issues/1221)) | ✅ merged |
 | **Yurasubs/multi-downloader-nx** | `-u/--url` auto service + ID detection (`modules/module.url.ts`) | ✅ merged |
 | **Yurasubs** | `-F/--list-formats` flag | ✅ merged (flag + docs) |
-| **Yurasubs** | `--majin` high-bitrate CENC DASH flag | ✅ flag merged |
+| **Yurasubs** | `--majin` high-bitrate CENC DASH encode + auto-detection | ✅ merged (flag + implementation) |
 | **Yurasubs** | Cross-platform env-var expansion in `bin-path.yml` (`%VAR%`, `${VAR}`, `$VAR`, `~`) | ✅ merged |
 | **Yurasubs** | `modules/module.working-dir.ts` extraction (breaks an import cycle) | ✅ merged |
 | **MikoGome** | Audio track ordering by `--dubLang` | ⏭️ already upstream |
@@ -142,6 +142,20 @@ pnpm preview:cli            # regenerate cli-preview.html
 - CJK-aware width measurement (Japanese titles)
 
 ### Regressions fixed during verification
+
+**`--majin` was a flag with no implementation.** The option was merged into
+`module.args.ts` but the actual logic never was, so passing it did nothing.
+Now ported in full: `applyMajinTransform()` rewrites a playback URL to the
+majin/CENC rendition, and when the flag is *not* passed aniDL probes the majin
+manifest and switches automatically if it offers 1080p+ at >= 7500 kbps. Video
+streams also gained a bitrate tiebreaker in their sort.
+
+Two bugs in the fork's own version were fixed on the way in, both caught by
+`tests/majin.test.ts`: the transform was not idempotent (a second application
+produced `/static/majin/majin/`), and it rewrote HLS URLs into dead links since
+only DASH has a majin counterpart. Both are now guarded.
+
+
 
 **The live download view was built but never wired in.** `module.console.ts`
 shipped `DownloadTable` / `tracksTree` and they passed their unit tests, but no
