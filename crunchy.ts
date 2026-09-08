@@ -1839,57 +1839,57 @@ export default class Crunchy implements ServiceClass {
 					subtitles: videoStream.subtitles,
 					versions: videoStream.versions
 				};
-				if (options.majin) {
-					console.info('Majin quality mode enabled, transforming video stream URLs');
-					for (const key in derivedPlaystreams) {
-						derivedPlaystreams[key].url = this.applyMajinTransform(derivedPlaystreams[key].url);
-					}
-				} else {
-					// Probe for a majin encode and switch to it when it is meaningfully
-					// better (1080p+ at >= 7500 kbps). Ported from the Yurasubs fork.
+				// Majin is decided PER VERSION: a title can have a majin encode for one
+				// dub and none for another, so the choice must never be latched globally
+				// (doing so 404s the second version with "S3 Error: NoSuchKey").
+				{
 					const rawUrl = derivedPlaystreams['']?.url || Object.values(derivedPlaystreams)[0]?.url;
-					if (rawUrl) {
+					const majinUrl = rawUrl ? this.applyMajinTransform(rawUrl) : undefined;
+					let useMajin = false;
+
+					if (majinUrl && majinUrl !== rawUrl) {
 						try {
-							const majinUrl = this.applyMajinTransform(rawUrl);
-							if (majinUrl !== rawUrl) {
-								const majinReq = await this.req.getData(majinUrl, { ...AuthHeaders, silent: true });
-								if (majinReq.ok && majinReq.res) {
-									const majinBody = await majinReq.res.text();
-									if (majinBody.includes('MPD')) {
-										const parsedMajin = await parse(
-											majinBody,
-											langsData.findLang(langsData.fixLanguageTag(videoStream.audioLocale as string) || ''),
-											majinUrl.match(/.*\.urlset\//)?.[0]
-										);
-										const firstServer = Object.keys(parsedMajin)[0];
-										if (firstServer && parsedMajin[firstServer]?.video) {
-											const best = parsedMajin[firstServer].video.reduce(
-												(acc, v) => {
-													const kbps = Math.round(v.bandwidth / 1024);
-													const is1080pPlus = v.quality.height >= 1080 || v.quality.width >= 1920;
-													return is1080pPlus && kbps > acc ? kbps : acc;
-												},
-												0
-											);
-											if (best >= 7500) {
-												console.info(
-													`Majin stream available at [repr.number]${best}[/] kbps (1080p+), automatically enabling Majin quality mode`
-												);
-												options.majin = true;
-												for (const key in derivedPlaystreams) {
-													derivedPlaystreams[key].url = this.applyMajinTransform(derivedPlaystreams[key].url);
-												}
-											} else if (best > 0) {
-												console.debug(`Majin stream found at ${best} kbps, below the 7500 kbps threshold - keeping the standard encode`);
-											}
-										}
-									}
-								} else {
-									console.debug('No majin encode available for this title');
+							const majinReq = await this.req.getData(majinUrl, { ...AuthHeaders, silent: true });
+							const majinBody = majinReq.ok && majinReq.res ? await majinReq.res.text() : '';
+							if (majinBody.includes('MPD')) {
+								const parsedMajin = await parse(
+									majinBody,
+									langsData.findLang(langsData.fixLanguageTag(videoStream.audioLocale as string) || ''),
+									majinUrl.match(/.*\.urlset\//)?.[0]
+								);
+								const firstServer = Object.keys(parsedMajin)[0];
+								const best = firstServer
+									? (parsedMajin[firstServer]?.video ?? []).reduce((acc, v) => {
+											const kbps = Math.round(v.bandwidth / 1024);
+											const is1080pPlus = v.quality.height >= 1080 || v.quality.width >= 1920;
+											return is1080pPlus && kbps > acc ? kbps : acc;
+										}, 0)
+									: 0;
+
+								if (options.majin) {
+									useMajin = true;
+									console.info('Majin quality mode enabled, using the majin video stream');
+								} else if (best >= 7500) {
+									useMajin = true;
+									console.info(
+										`Majin stream available at [repr.number]${best}[/] kbps (1080p+), automatically enabling Majin quality mode`
+									);
+								} else if (best > 0) {
+									console.debug(`Majin stream found at ${best} kbps, below the 7500 kbps threshold - keeping the standard encode`);
 								}
+							} else if (options.majin) {
+								console.warn('No majin encode exists for this version - falling back to the standard stream');
+							} else {
+								console.debug('No majin encode available for this version');
 							}
 						} catch (e) {
 							console.debug(`Majin probe failed, continuing with the standard encode: ${(e as Error).message}`);
+						}
+					}
+
+					if (useMajin) {
+						for (const key in derivedPlaystreams) {
+							derivedPlaystreams[key].url = this.applyMajinTransform(derivedPlaystreams[key].url);
 						}
 					}
 				}
@@ -3113,7 +3113,7 @@ export default class Crunchy implements ServiceClass {
 								addTrack({
 									key: `sub-${sxData.file}`,
 									type: 'Subtitle',
-									label: `${sxData.path.endsWith('.ass') ? 'ASS' : 'VTT'} | ${sxData.language?.code ?? '??'} | ${sxData.title ?? sxData.file}`
+									label: `${sxData.path.endsWith('.ass') ? 'ASS' : 'VTT'} | ${sxData.language?.code ?? '??'} | ${sxData.title ?? sxData.file}${/\.signs\./i.test(sxData.file) ? ' (Signs)' : /\.cc\./i.test(sxData.file) ? ' (CC)' : ''}`
 								});
 								trackState(`sub-${sxData.file}`, 'Downloaded');
 								console.debug(`Subtitle downloaded: ${sxData.file}`);

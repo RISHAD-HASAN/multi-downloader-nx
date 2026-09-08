@@ -75,6 +75,15 @@ const applyMajinTransform = (url: string): string => {
 	assert.ok(cr.includes('automatically enabling Majin quality mode'), 'auto-probe missing');
 	assert.ok(/a\.bandwidth - b\.bandwidth/.test(cr), 'video sort lost its bitrate tiebreaker');
 
+	// Regression: majin must be decided per version. Latching options.majin = true
+	// during the first dub 404s the second one ("S3 Error: NoSuchKey").
+	assert.ok(!/options\.majin\s*=\s*true/.test(cr), 'options.majin must not be latched globally');
+	assert.ok(cr.includes('let useMajin = false'), 'majin must be resolved into a per-version local');
+	assert.ok(
+		cr.includes('No majin encode exists for this version'),
+		'--majin must fall back with a warning when a version has no majin encode'
+	);
+
 	const args = fs.readFileSync(path.join(__dirname, '..', 'modules', 'module.args.ts'), 'utf8');
 	assert.ok(args.includes("name: 'majin'"), '--majin flag missing from the arg list');
 

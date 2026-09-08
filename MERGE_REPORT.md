@@ -141,6 +141,18 @@ pnpm preview:cli            # regenerate cli-preview.html
 - Wrapping width + hanging indent
 - CJK-aware width measurement (Japanese titles)
 
+### Majin: per-version, never latched
+
+The fork sets `options.majin = true` once auto-detection succeeds and then
+applies the URL rewrite to every later version. A title can have a majin encode
+for one dub and none for another, so the second version 404s with
+`S3 Error: NoSuchKey` and the whole episode fails.
+
+Majin is now resolved into a per-version local: the majin manifest is probed for
+each version, and it is only used when that probe returns a real MPD. An
+explicit `--majin` that finds no encode warns and falls back to the standard
+stream instead of failing.
+
 ### Output/UX pass
 
 - **Subprocess output is captured, not inherited.** `Helper.exec` used
