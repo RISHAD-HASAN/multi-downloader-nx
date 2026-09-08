@@ -2214,7 +2214,7 @@ export default class Crunchy implements ServiceClass {
 									'content-type': 'application/octet-stream',
 									'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
 									'x-cr-video-token': videoStream!.token
-								});
+								}, 'crunchyroll');
 
 								// Check if the audio pssh is different since Crunchyroll started to have different dec keys for audio tracks
 								if (chosenAudioSegments.pssh_wvd && chosenAudioSegments.pssh_wvd !== chosenVideoSegments.pssh_wvd) {
@@ -2226,7 +2226,7 @@ export default class Crunchy implements ServiceClass {
 										'content-type': 'application/octet-stream',
 										'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
 										'x-cr-video-token': audioStream!.token
-									});
+									}, 'crunchyroll');
 								} else {
 									encryptionKeysAudio = encryptionKeysVideo;
 								}
@@ -2242,7 +2242,7 @@ export default class Crunchy implements ServiceClass {
 									'content-type': 'application/octet-stream',
 									'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
 									'x-cr-video-token': videoStream!.token
-								});
+								}, 'crunchyroll');
 
 								// Check if the audio pssh is different since Crunchyroll started to have different dec keys for audio tracks
 								if (chosenAudioSegments.pssh_prd && chosenAudioSegments.pssh_prd !== chosenVideoSegments.pssh_prd) {
@@ -2254,7 +2254,7 @@ export default class Crunchy implements ServiceClass {
 										'content-type': 'application/octet-stream',
 										'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
 										'x-cr-video-token': audioStream!.token
-									});
+									}, 'crunchyroll');
 								} else {
 									encryptionKeysAudio = encryptionKeysVideo;
 								}

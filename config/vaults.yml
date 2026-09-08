@@ -1,0 +1,33 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Content Key Vaults  (ported from unshackle - https://github.com/unshackle-dl/unshackle)
+#
+# A vault caches KID -> CONTENT KEY pairs per service. When a title is
+# re-downloaded - or when another dub/season shares the same keys - aniDL reads
+# the key straight from the vault and never contacts the licence server.
+#
+# Local vaults are always queried before network vaults. Keys obtained from a
+# licence are written back to every vault that does not set `no_push: true`.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Master switch. Set to false to bypass all vaults (always request a licence).
+enabled: true
+
+key_vaults:
+  # Local SQLite database. Table layout is compatible with unshackle/devine
+  # vaults, so you can point this at an existing key_vault.db.
+  # Requires Node >= 22.5 for the built-in node:sqlite module.
+  - type: SQLite
+    name: 'Local Vault'
+    path: './config/key_vault.db'
+
+  # Zero-dependency JSON fallback, useful on older Node builds.
+  # - type: JSON
+  #   name: 'Local JSON Vault'
+  #   path: './config/key_vault.json'
+
+  # Remote HTTP vault (unshackle "API" vault protocol).
+  # - type: API
+  #   name: 'Team Vault'
+  #   uri: 'https://vault.example.com/api'
+  #   token: 'your-secret-key'
+  #   no_push: false

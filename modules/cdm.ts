@@ -5,6 +5,7 @@ import path from 'path';
 import * as reqModule from './module.fetch';
 import Playready from 'node-playready';
 import { Widevine, KeyContainer, LicenseType } from 'widevine';
+import { resolveKeys } from './module.drm-cache';
 
 const req = new reqModule.Req();
 
@@ -117,7 +118,7 @@ try {
 	canDecrypt = false;
 }
 
-export async function getKeysWVD(pssh: string | undefined, licenseServer: string, authData: Record<string, string>): Promise<KeyContainer[]> {
+async function requestKeysWVD(pssh: string | undefined, licenseServer: string, authData: Record<string, string>): Promise<KeyContainer[]> {
 	if (!pssh || !canDecrypt || !widevine) return [];
 	// pssh found in the mpd manifest
 	const psshBuffer = Buffer.from(pssh, 'base64');
@@ -147,7 +148,7 @@ export async function getKeysWVD(pssh: string | undefined, licenseServer: string
 	}
 }
 
-export async function getKeysPRD(pssh: string | undefined, licenseServer: string, authData: Record<string, string>): Promise<KeyContainer[]> {
+async function requestKeysPRD(pssh: string | undefined, licenseServer: string, authData: Record<string, string>): Promise<KeyContainer[]> {
 	if (!pssh || !canDecrypt || !playready) return [];
 
 	// Generate Playready challenge
@@ -178,4 +179,43 @@ export async function getKeysPRD(pssh: string | undefined, licenseServer: string
 		console.error('License parsing failed');
 		return [];
 	}
+}
+
+
+/**
+ * Vault-aware Widevine key retrieval.
+ *
+ * Content keys are looked up in the configured key vaults first (see
+ * config/vaults.yml); the licence server is only contacted for KIDs that are
+ * not already cached, and any freshly obtained key is written back.
+ */
+export async function getKeysWVD(
+	pssh: string | undefined,
+	licenseServer: string,
+	authData: Record<string, string>,
+	service = 'generic'
+): Promise<KeyContainer[]> {
+	if (!pssh || !canDecrypt) return [];
+	return (await resolveKeys({
+		service,
+		drm: 'Widevine',
+		pssh,
+		licence: () => requestKeysWVD(pssh, licenseServer, authData)
+	})) as KeyContainer[];
+}
+
+/** Vault-aware PlayReady key retrieval. See {@link getKeysWVD}. */
+export async function getKeysPRD(
+	pssh: string | undefined,
+	licenseServer: string,
+	authData: Record<string, string>,
+	service = 'generic'
+): Promise<KeyContainer[]> {
+	if (!pssh || !canDecrypt) return [];
+	return (await resolveKeys({
+		service,
+		drm: 'PlayReady',
+		pssh,
+		licence: () => requestKeysPRD(pssh, licenseServer, authData)
+	})) as KeyContainer[];
 }

@@ -5,6 +5,7 @@ import fs from 'fs';
 import { lookpath } from 'lookpath';
 import { console } from './log';
 import { GuiState } from '../@types/messageHandler';
+import type { VaultConfig } from './module.vault';
 
 // new-cfg
 const workingDir = (
@@ -29,6 +30,7 @@ const sessCfgFile = {
 	hd: path.join(workingDir, 'config', 'hd_sess'),
 	adn: path.join(workingDir, 'config', 'adn_sess')
 };
+const vaultCfgFile = path.join(workingDir, 'config', 'vaults');
 const stateFile = path.join(workingDir, 'config', 'guistate');
 const tokenFile = {
 	cr: path.join(workingDir, 'config', 'cr_token'),
@@ -40,7 +42,7 @@ const tokenFile = {
 export const ensureConfig = () => {
 	if (!fs.existsSync(path.join(workingDir, 'config'))) fs.mkdirSync(path.join(workingDir, 'config'), { recursive: true });
 	if (process.env.contentDirectory)
-		[binCfgFile, dirCfgFile, cliCfgFile, guiCfgFile].forEach((a) => {
+		[binCfgFile, dirCfgFile, cliCfgFile, guiCfgFile, vaultCfgFile].forEach((a) => {
 			if (!fs.existsSync(`${a}.yml`)) fs.copyFileSync(path.join(__dirname, '..', 'config', `${path.basename(a)}.yml`), `${a}.yml`);
 		});
 };
@@ -343,6 +345,14 @@ const getState = (): GuiState => {
 			services: {}
 		};
 	}
+};
+
+/**
+ * Load `config/vaults.yml` - the content key vault chain (ported from unshackle).
+ * Returns an empty list when the file is absent so vaults stay opt-in.
+ */
+const loadVaultCfg = (): { key_vaults?: VaultConfig[]; enabled?: boolean } => {
+	return loadYamlCfgFile<{ key_vaults?: VaultConfig[]; enabled?: boolean }>(vaultCfgFile);
 };
 
 const setState = (state: GuiState) => {
