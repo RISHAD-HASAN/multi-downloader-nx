@@ -865,7 +865,8 @@ export default class Crunchy implements ServiceClass {
 			oMetadata.push(`EPs: ${iMetadata.episode_count}`);
 		}
 		if (item.season_number && !iMetadata.hide_season_title && !iMetadata.hide_season_number) {
-			oMetadata.push(`Season: ${item.season_number}`);
+			const displaySeason = normalizedSeasonNumber(item.title, item.season_number);
+			oMetadata.push(displaySeason === 0 ? 'Specials' : `Season: ${displaySeason}`);
 		}
 		if (item.type == 'episode') {
 			if (iMetadata.episode) {
