@@ -38,6 +38,20 @@ import { ServiceClass } from './@types/serviceClassInterface';
 import { CrunchyAndroidEpisodes } from './@types/crunchyAndroidEpisodes';
 import { parse } from './modules/module.transform-mpd';
 import { AndroidObject, CrunchyAndroidObject, CrunchyMVObject } from './@types/crunchyAndroidObject';
+
+function normalizedSeasonNumber(title: string | undefined, value: number | string | undefined): number {
+	const name = (title ?? '').toLowerCase();
+	if (/\b(ova|oad|ona|specials?|recap|compilation|summary|movie|film|extra)\b/.test(name)) return 0;
+	const titledSeason = name.match(/\bseason\s*(\d+)/);
+	if (titledSeason) return Number(titledSeason[1]);
+	const number = Number(value);
+	return Number.isFinite(number) ? number : 0;
+}
+
+function seasonLabel(title: string | undefined, value: number | string | undefined): string {
+	const number = normalizedSeasonNumber(title, value);
+	return number === 0 ? 'Specials' : `Season ${number}`;
+}
 import { CrunchyChapters, CrunchyChapter, CrunchyOldChapter } from './@types/crunchyChapters';
 import vtt2ass from './modules/module.vtt2ass';
 import { CrunchyPlayStream } from './@types/crunchyPlayStreams';
@@ -1200,7 +1214,7 @@ export default class Crunchy implements ServiceClass {
 				episodeNumber: item.episode,
 				episodeTitle: item.title,
 				seasonID: item.season_id,
-				season: item.season_number,
+				season: normalizedSeasonNumber(item.season_title, item.season_number),
 				showID: id,
 				e: selEpId,
 				image: images[Math.floor(images.length / 2)].source
@@ -3354,7 +3368,7 @@ export default class Crunchy implements ServiceClass {
 			const epNum = key.startsWith('E') ? `E${data?.absolute ? item.items[0].episode_number?.toString() || item.items[0].episode : key.slice(1)}` : key;
 			console.info(`[${data?.absolute ? epNum : key}] [${item.items[0].upload_date ? new Date(item.items[0].upload_date).toISOString().slice(0, 10) : '0000-00-00'}] ${
 				item.items.find((a) => !a.season_title.match(/\(\w+ Dub\)/))?.season_title ?? item.items[0].season_title.replace(/\(\w+ Dub\)/g, '').trimEnd()
-			} - Season ${item.items[0].season_number} - ${item.items[0].title}
+			} - ${seasonLabel(item.items[0].season_title, item.items[0].season_number)} - ${item.items[0].title}
    - Versions: ${item.items
 				.map((a, index) => {
 					return `${a.is_premium_only ? '☆ ' : ''}${item.langs?.[index]?.name ?? 'Unknown'}`;
@@ -3389,7 +3403,7 @@ export default class Crunchy implements ServiceClass {
 					e: epNum,
 					lang: value.langs.map((a) => a?.code),
 					name: value.items[0].title,
-					season: value.items[0].season_number.toString(),
+					season: normalizedSeasonNumber(value.items[0].season_title, value.items[0].season_number).toString(),
 					seriesTitle: value.items[0].series_title.replace(/\(\w+ Dub\)/g, '').trimEnd(),
 					seasonTitle: value.items[0].season_title.replace(/\(\w+ Dub\)/g, '').trimEnd(),
 					episode: value.items[0].episode_number?.toString() ?? value.items[0].episode ?? '?',
@@ -3488,7 +3502,7 @@ export default class Crunchy implements ServiceClass {
 					episodeNumber: epNum,
 					episodeTitle: item.title,
 					seasonID: item.season_id,
-					season: item.season_number,
+					season: normalizedSeasonNumber(item.season_title, item.season_number),
 					showID: item.series_id,
 					e: epNum,
 					image: images[Math.floor(images.length / 2)].source
@@ -3534,10 +3548,9 @@ export default class Crunchy implements ServiceClass {
 			i++;
 			for (const lang of langsData.languages) {
 				//TODO: Make sure the below code is fine
-				let season_number = item.season_number;
-				if (item.versions) {
-					season_number = i;
-				}
+				let season_number = normalizedSeasonNumber(item.title, item.season_number);
+				// Crunchyroll gives dubbed/Japanese versions different raw season numbers.
+				// The title is the stable source for the real season number.
 				if (!Object.prototype.hasOwnProperty.call(ret, season_number)) ret[season_number] = {};
 				if (item.title.includes(`(${lang.name} Dub)`) || item.title.includes(`(${lang.name})`)) {
 					ret[season_number][lang.code] = item;
