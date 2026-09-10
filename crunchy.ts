@@ -353,36 +353,33 @@ export default class Crunchy implements ServiceClass {
 		return allShows;
 	}
 
-	public async getFonts() {
-		console.info('Downloading fonts...');
-		const fonts = Object.values(fontsData.fontFamilies).reduce((pre, curr) => pre.concat(curr));
+	public async getFonts(required?: string[]) {
+		const fonts = required ?? Object.values(fontsData.fontFamilies).reduce((pre, curr) => pre.concat(curr));
+		const automatic = required !== undefined;
+		if (!automatic) console.info('Downloading fonts...');
 		for (const f of fonts) {
 			const fontLoc = path.join(this.cfg.dir.fonts, f);
 			if (fs.existsSync(fontLoc) && fs.statSync(fontLoc).size != 0) {
-				console.info(`${f} already downloaded!`);
+				if (!automatic) console.info(`${f} already downloaded!`);
 			} else {
 				const fontFolder = path.dirname(fontLoc);
 				if (fs.existsSync(fontLoc) && fs.statSync(fontLoc).size == 0) {
 					fs.rmSync(fontLoc, { recursive: true, force: true });
 				}
-				try {
-					fs.existsSync(fontFolder);
-				} catch (e) {
-					console.info('');
-				}
+				fs.mkdirSync(fontFolder, { recursive: true });
 				const fontUrl = fontsData.root + f;
 				const getFont = await this.req.getData(fontUrl, {
 					headers: api.crunchyDefHeader
 				});
 				if (getFont.ok && getFont.res) {
 					fs.writeFileSync(fontLoc, Buffer.from(await getFont.res.arrayBuffer()));
-					console.info(`Downloaded: ${f}`);
+					console.info(automatic ? `${f} was missing so downloaded` : `Downloaded: ${f}`);
 				} else {
 					console.warn(`Failed to download: ${f}`);
 				}
 			}
 		}
-		console.info('All required fonts downloaded!');
+		if (!automatic) console.info('All required fonts downloaded!');
 	}
 
 	public async doAuth(data: AuthData): Promise<AuthResponse> {
@@ -3181,6 +3178,13 @@ export default class Crunchy implements ServiceClass {
 
 	public async muxStreams(data: DownloadedMedia[], options: CrunchyMuxOptions) {
 		this.cfg.bin = await yamlCfg.loadBinCfg();
+		const requiredFonts = [...new Set(
+			data
+				.filter((item) => item.type === 'Subtitle')
+				.flatMap((item) => (item.fonts ?? []) as string[])
+				.flatMap((font) => fontsData.fontFamilies[font as keyof typeof fontsData.fontFamilies] ?? [])
+		)];
+		if (requiredFonts.length > 0) await this.getFonts(requiredFonts);
 		let hasAudioStreams = false;
 		if (options.novids || data.filter((a) => a.type === 'Video').length === 0) return console.info('Skip muxing since no vids are downloaded');
 		if (options.subdlfailed && options.skipMuxOnSubFail) return console.info('Skip muxing since some subtitles failed to download');
