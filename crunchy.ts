@@ -3460,7 +3460,17 @@ export default class Crunchy implements ServiceClass {
 		for (const key of Object.keys(eps)) {
 			const itemE = eps[key];
 			itemE.items.forEach((item, index) => {
-				if (!dubLang.includes(itemE.langs[index]?.code)) return;
+				const language = itemE.langs[index];
+				const requested = Boolean(language && dubLang.includes(language.code));
+				const original = item.versions?.find((version) => version.original);
+				const originalLanguage = original ? langsData.languages.find((a) => a.cr_locale == original.audio_locale) : undefined;
+				const fallbackOriginal = Boolean(
+					originalLanguage &&
+					(originalLanguage.code == 'jpn' || originalLanguage.code == 'eng' || dubLang.includes('jpn') || dubLang.includes('eng')) &&
+					!dubLang.includes(originalLanguage.code) &&
+					language?.code == originalLanguage.code
+				);
+				if (!requested && !fallbackOriginal) return;
 				item.hide_season_title = true;
 				if (item.season_title == '' && item.series_title != '') {
 					item.season_title = item.series_title;
