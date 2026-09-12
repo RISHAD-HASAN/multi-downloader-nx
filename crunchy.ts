@@ -1991,7 +1991,8 @@ export default class Crunchy implements ServiceClass {
 						['service', 'CR', false],
 						['seriesTitle', medias.seriesTitle, true],
 						['showTitle', medias.seriesTitle ?? medias.seasonTitle, true],
-						['season', medias.season, false]
+						['season', medias.season, false],
+						['audio', medias.data.length > 1 ? 'DUAL.' : '', false]
 					] as [AvailableFilenameVars, string | number, boolean][]
 				).map((a): Variable => {
 					return {

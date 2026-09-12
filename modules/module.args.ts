@@ -14,9 +14,9 @@ const groups = {
 	gui: 'GUI:'
 };
 
-export type AvailableFilenameVars = 'title' | 'episode' | 'showTitle' | 'seriesTitle' | 'season' | 'width' | 'height' | 'service';
+export type AvailableFilenameVars = 'title' | 'episode' | 'showTitle' | 'seriesTitle' | 'season' | 'width' | 'height' | 'service' | 'audio';
 
-const availableFilenameVars: AvailableFilenameVars[] = ['title', 'episode', 'showTitle', 'seriesTitle', 'season', 'width', 'height', 'service'];
+const availableFilenameVars: AvailableFilenameVars[] = ['title', 'episode', 'showTitle', 'seriesTitle', 'season', 'width', 'height', 'service', 'audio'];
 
 export type AvailableMuxer = 'ffmpeg' | 'mkvmerge';
 export const muxer: AvailableMuxer[] = ['ffmpeg', 'mkvmerge'];
