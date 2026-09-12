@@ -1876,10 +1876,37 @@ export default class Crunchy implements ServiceClass {
 										}, 0)
 									: 0;
 
+								let standardBest = 0;
+								if (!options.majin && rawUrl) {
+									try {
+										const standardReq = await this.req.getData(rawUrl, { ...AuthHeaders, silent: true });
+										if (standardReq.ok && standardReq.res) {
+											const standardBody = await standardReq.res.text();
+											if (standardBody.includes('MPD')) {
+												const parsedStandard = await parse(
+													standardBody,
+													langsData.findLang(langsData.fixLanguageTag(videoStream.audioLocale as string) || ''),
+													rawUrl.match(/.*\.urlset\//)?.[0]
+												);
+												const standardServer = Object.keys(parsedStandard)[0];
+												standardBest = standardServer
+													? (parsedStandard[standardServer]?.video ?? []).reduce((acc, v) => {
+														const kbps = Math.round(v.bandwidth / 1024);
+														const is1080pPlus = v.quality.height >= 1080 || v.quality.width >= 1920;
+														return is1080pPlus && kbps > acc ? kbps : acc;
+													}, 0)
+													: 0;
+											}
+										}
+									} catch {
+										standardBest = 0;
+									}
+								}
+
 								if (options.majin) {
 									useMajin = true;
 									console.info('Majin quality mode enabled, using the majin video stream');
-								} else if (best >= 7500) {
+								} else if (best >= 7500 && (standardBest === 0 || best >= standardBest)) {
 									useMajin = true;
 									console.info(
 										`Majin stream available at [repr.number]${best}[/] kbps (1080p+), automatically enabling Majin quality mode`
