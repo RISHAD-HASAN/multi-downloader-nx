@@ -368,10 +368,16 @@ export default class Crunchy implements ServiceClass {
 				}
 				fs.mkdirSync(fontFolder, { recursive: true });
 				const fontUrl = fontsData.root + f;
-				const getFont = await this.req.getData(fontUrl, {
-					headers: api.crunchyDefHeader
-				});
-				if (getFont.ok && getFont.res) {
+				let getFont: Awaited<ReturnType<typeof this.req.getData>> | undefined;
+				for (let attempt = 1; attempt <= 3; attempt++) {
+					getFont = await this.req.getData(fontUrl, {
+						headers: api.crunchyDefHeader,
+						silent: true
+					});
+					if (getFont.ok && getFont.res) break;
+					if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+				}
+				if (getFont?.ok && getFont.res) {
 					fs.writeFileSync(fontLoc, Buffer.from(await getFont.res.arrayBuffer()));
 					console.info(automatic ? `${f} was missing so downloaded` : `Downloaded: ${f}`);
 				} else {
