@@ -2239,9 +2239,10 @@ export default class Crunchy implements ServiceClass {
 							};
 						});
 
-						videos.sort((a, b) => {
-							return a.quality.width - b.quality.width || a.bandwidth - b.bandwidth;
-						});
+						// Sort by bitrate first, then resolution. The second stable sort keeps
+						// the highest-bitrate representation when several tracks are 1080p.
+						videos.sort((a, b) => a.bandwidth - b.bandwidth);
+						videos.sort((a, b) => a.quality.width - b.quality.width);
 
 						audios.sort((a, b) => {
 							return a.bandwidth - b.bandwidth;
