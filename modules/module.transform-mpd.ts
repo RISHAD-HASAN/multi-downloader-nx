@@ -1,4 +1,6 @@
 import { parse as mpdParse } from 'mpd-parser';
+import { parseISODuration } from './module.crunchy-quality';
+export { parseISODuration, formatBytes } from './module.crunchy-quality';
 import { LanguageItem, findLang, languages } from './module.langsData';
 import { console } from './log';
 import * as reqModule from './module.fetch';
@@ -29,6 +31,8 @@ export type PlaylistItem = {
 	pssh_wvd?: string;
 	pssh_prd?: string;
 	bandwidth: number;
+	actualBitrate?: number;
+	byteLength?: number;
 	segments: Segment[];
 };
 
@@ -71,45 +75,52 @@ export async function parse(manifest: string, language?: LanguageItem, url?: str
 	if (!manifest.includes('BaseURL') && url) {
 		manifest = manifest.replace(/(<MPD*\b[^>]*>)/gm, `$1<BaseURL>${url}</BaseURL>`);
 	}
+	const manifestDuration = parseISODuration(manifest.match(/mediaPresentationDuration="([^"]+)"/)?.[1]);
 	const parsed = mpdParse(manifest);
 	const ret: MPDParsed = {};
 
 	// Audio Loop
-	for (const item of Object.values(parsed.mediaGroups.AUDIO.audio)) {
+	for (const item of Object.values(parsed.mediaGroups?.AUDIO?.audio ?? {})) {
 		for (const playlist of item.playlists) {
 			const host = new URL(playlist.resolvedUri).hostname;
 			if (!Object.prototype.hasOwnProperty.call(ret, host)) ret[host] = { audio: [], video: [] };
 
 			if (playlist.sidx && playlist.segments.length == 0) {
 				const options: FetchParams = {
-					method: 'head'
+					method: 'HEAD'
 				};
 				const itemReq = await req.getData(playlist.sidx.uri, options);
-				if (!itemReq.res || !itemReq.ok)
+				if (!itemReq.res || !itemReq.ok) {
 					console.warn(
 						`${itemReq.error?.res?.status}: ${itemReq.error?.res?.statusText}, Unable to fetch byteLength for audio stream ${Math.round(playlist.attributes.BANDWIDTH / 1024)}KiB/s`
 					);
-				const byteLength = parseInt(itemReq.res?.headers?.get('content-length') as string);
-				let currentByte = playlist.sidx.map.byterange.length;
-				while (currentByte <= byteLength) {
-					playlist.segments.push({
-						duration: 0,
-						map: {
+				}
+				const clHeader = itemReq.res?.headers?.get('content-length');
+				const byteLength = Number(clHeader);
+				if (itemReq.res?.status === 200 && Number.isSafeInteger(byteLength) && byteLength > 0) {
+					let currentByte = playlist.sidx.map.byterange.length;
+					while (currentByte <= byteLength) {
+						playlist.segments.push({
+							duration: 0,
+							map: {
+								uri: playlist.resolvedUri,
+								resolvedUri: playlist.resolvedUri,
+								byterange: playlist.sidx.map.byterange
+							},
 							uri: playlist.resolvedUri,
 							resolvedUri: playlist.resolvedUri,
-							byterange: playlist.sidx.map.byterange
-						},
-						uri: playlist.resolvedUri,
-						resolvedUri: playlist.resolvedUri,
-						byterange: {
-							length: 500000,
-							offset: currentByte
-						},
-						timeline: 0,
-						number: 0,
-						presentationTime: 0
-					});
-					currentByte = currentByte + 500000;
+							byterange: {
+								length: 500000,
+								offset: currentByte
+							},
+							timeline: 0,
+							number: 0,
+							presentationTime: 0
+						});
+						currentByte = currentByte + 500000;
+					}
+				} else {
+					console.warn(`[MPD] Invalid or missing content-length for audio stream sidx: ${clHeader}`);
 				}
 			}
 
@@ -161,42 +172,56 @@ export async function parse(manifest: string, language?: LanguageItem, url?: str
 		const host = new URL(playlist.resolvedUri).hostname;
 		if (!Object.prototype.hasOwnProperty.call(ret, host)) ret[host] = { audio: [], video: [] };
 
+		let actualBitrate: number | undefined;
+		let byteLength: number | undefined;
 		if (playlist.sidx && playlist.segments.length == 0) {
 			const options: FetchParams = {
-				method: 'head'
+				method: 'HEAD'
 			};
 			const itemReq = await req.getData(playlist.sidx.uri, options);
-			if (!itemReq.res || !itemReq.ok)
+			if (!itemReq.res || !itemReq.ok) {
 				console.warn(
 					`${itemReq.error?.res?.status}: ${itemReq.error?.res?.statusText}, Unable to fetch byteLength for video stream ${playlist.attributes.RESOLUTION?.height}x${playlist.attributes.RESOLUTION?.width}@${Math.round(playlist.attributes.BANDWIDTH / 1024)}KiB/s`
 				);
-			const byteLength = parseInt(itemReq.res?.headers?.get('content-length') as string);
-			let currentByte = playlist.sidx.map.byterange.length;
-			while (currentByte <= byteLength) {
-				playlist.segments.push({
-					duration: 0,
-					map: {
+			}
+			const clHeader = itemReq.res?.headers?.get('content-length');
+			const parsedByteLength = Number(clHeader);
+			if (itemReq.res?.status === 200 && Number.isSafeInteger(parsedByteLength) && parsedByteLength > 0) {
+				byteLength = parsedByteLength;
+				if (manifestDuration > 0) {
+					actualBitrate = Math.round((byteLength * 8) / manifestDuration);
+				}
+				let currentByte = playlist.sidx.map.byterange.length;
+				while (currentByte <= byteLength) {
+					playlist.segments.push({
+						duration: 0,
+						map: {
+							uri: playlist.resolvedUri,
+							resolvedUri: playlist.resolvedUri,
+							byterange: playlist.sidx.map.byterange
+						},
 						uri: playlist.resolvedUri,
 						resolvedUri: playlist.resolvedUri,
-						byterange: playlist.sidx.map.byterange
-					},
-					uri: playlist.resolvedUri,
-					resolvedUri: playlist.resolvedUri,
-					byterange: {
-						length: 2000000,
-						offset: currentByte
-					},
-					timeline: 0,
-					number: 0,
-					presentationTime: 0
-				});
-				currentByte = currentByte + 2000000;
+						byterange: {
+							length: 2000000,
+							offset: currentByte
+						},
+						timeline: 0,
+						number: 0,
+						presentationTime: 0
+					});
+					currentByte = currentByte + 2000000;
+				}
+			} else {
+				console.warn(`[MPD] Invalid or missing content-length for video stream sidx: ${clHeader}`);
 			}
 		}
 
 		const pItem: VideoPlayList = {
-			bandwidth: playlist.attributes.BANDWIDTH,
+			bandwidth: actualBitrate ?? playlist.attributes.BANDWIDTH,
 			quality: playlist.attributes.RESOLUTION!,
+			actualBitrate,
+			byteLength,
 			segments: playlist.segments.map((segment): Segment => {
 				const uri = segment.resolvedUri;
 				const map_uri = segment.map.resolvedUri;

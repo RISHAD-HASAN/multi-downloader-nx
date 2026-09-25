@@ -182,7 +182,7 @@ class Merger {
 			const chapterFilePath = this.options.chapters[0].path;
 			const chapterData = convertChaptersToFFmpegFormat(this.options.chapters[0].path);
 			fs.writeFileSync(chapterFilePath, chapterData, 'utf-8');
-			args.push(`-i "${chapterFilePath}" -map_metadata 1`);
+			args.push(`-i "${chapterFilePath}" -map_metadata ${index + this.options.subtitles.length}`);
 		}
 
 		if (this.options.output.split('.').pop() === 'mkv') {
@@ -461,12 +461,20 @@ class Merger {
 	}
 
 	public cleanUp() {
+		const safeDelete = (file?: string) => {
+			if (!file) return;
+			try {
+				if (fs.existsSync(file)) fs.rmSync(file, { force: true });
+			} catch (error) {
+				console.debug(`[CleanUp] Could not remove temp file ${file}: ${error}`);
+			}
+		};
 		this.options.onlyAudio
 			.concat(this.options.onlyVid)
 			.concat(this.options.videoAndAudio)
-			.forEach((a) => fs.unlinkSync(a.path));
-		this.options.chapters?.forEach((a) => fs.unlinkSync(a.path));
-		this.options.subtitles.forEach((a) => fs.unlinkSync(a.file));
+			.forEach((item) => safeDelete(item.path));
+		this.options.chapters?.forEach((item) => safeDelete(item.path));
+		this.options.subtitles.forEach((item) => safeDelete(item.file));
 	}
 }
 

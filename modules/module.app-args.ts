@@ -45,6 +45,7 @@ export let argvC: {
 	e: string | undefined;
 	extid: string | undefined;
 	q: number;
+	F: boolean;
 	x: number;
 	cstream: keyof typeof CrunchyVideoPlayStreams;
 	vstream: keyof typeof CrunchyVideoPlayStreams;
@@ -107,14 +108,26 @@ export let argvC: {
 	// List every available video/audio format and exit (fork: Yurasubs)
 	'list-formats': boolean;
 	listFormats: boolean;
-	// Crunchyroll high-bitrate CENC DASH streams (fork: Yurasubs)
+	// Crunchyroll DASH stream selection (fork: Yurasubs)
 	majin: boolean;
+	cbr: '0' | '1' | undefined;
 	// console output
 	theme: string;
 	noColor: boolean;
 };
 
 export type ArgvType = typeof argvC;
+
+const syncArgAliases = (parsed: ArgvType): void => {
+	for (const item of args) {
+		const camel = item.name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+		const value = parsed[camel] ?? parsed[item.name] ?? (item.alias ? parsed[item.alias] : undefined);
+		if (value === undefined) continue;
+		parsed[camel] = value;
+		parsed[item.name] = value;
+		if (item.alias) parsed[item.alias] = value;
+	}
+};
 
 // This functions manages slight mismatches like -srz and returns it as --srz
 const processArgv = () => {
@@ -163,21 +176,8 @@ const appArgv = (
 	const argv = getCommander(cfg, isGUI).parse(processArgv());
 	const parsed = argv.opts() as ArgvType;
 
-	// Be sure that both vars (name and alias) are defined
-	for (const item of args) {
-		const name = item.name;
-		const alias = item.alias;
-
-		if (!alias) continue;
-
-		if (parsed[name] !== undefined) {
-			parsed[alias] = parsed[name];
-		}
-
-		if (parsed[alias] !== undefined) {
-			parsed[name] = parsed[alias];
-		}
-	}
+	// Keep dashed names, Commander camelCase names and aliases in sync.
+	syncArgAliases(parsed);
 
 	if (!isGUI && (process.argv.length <= 2 || parsed.help)) {
 		argv.outputHelp();
@@ -194,31 +194,21 @@ const overrideArguments = (cfg: { [key: string]: unknown }, override: Partial<ty
 
 	for (const [key, val] of Object.entries(override)) {
 		if (val === undefined) continue;
+		const matched = args.find((arg) => arg.name === key || arg.alias === key || arg.name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()) === key);
+		const name = matched?.alias === key ? key : (matched?.name ?? key);
+		const flag = name.length > 1 ? `--${name}` : `-${name}`;
 		if (typeof val === 'boolean') {
-			if (val) baseArgv.push(key.length > 1 ? `--${key}` : `-${key}`);
+			if (val) baseArgv.push(flag);
 		} else {
-			baseArgv.push(key.length > 1 ? `--${key}` : `-${key}`, String(val));
+			baseArgv.push(flag, String(val));
 		}
 	}
 
 	const data = argv.parse(baseArgv);
 	const parsed = data.opts() as ArgvType;
 
-	// Be sure that both vars (name and alias) are defined
-	for (const item of args) {
-		const name = item.name;
-		const alias = item.alias;
-
-		if (!alias) continue;
-
-		if (parsed[name] !== undefined) {
-			parsed[alias] = parsed[name];
-		}
-
-		if (parsed[alias] !== undefined) {
-			parsed[name] = parsed[alias];
-		}
-	}
+	// Keep dashed names, Commander camelCase names and aliases in sync.
+	syncArgAliases(parsed);
 
 	if (!isGUI && (process.argv.length <= 2 || parsed.help)) {
 		argv.outputHelp();

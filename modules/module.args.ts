@@ -1,3 +1,4 @@
+import { InvalidArgumentError } from 'commander';
 import { dubLanguageCodes, languages, searchLocales, subtitleLanguagesFilter } from './module.langsData';
 import { CrunchyVideoPlayStreams, CrunchyAudioPlayStreams } from '../@types/enums';
 
@@ -388,6 +389,20 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		usage: '',
 		default: {
 			default: false
+		}
+	},
+	{
+		name: 'cbr',
+		group: 'dl',
+		describe: 'Force a CBR stream instead of auto-comparison (0 = high bitrate, 1 = standard). Takes priority over --majin.',
+		docDescribe: true,
+		service: ['crunchy'],
+		type: 'string',
+		choices: ['0', '1'],
+		usage: '[0|1]',
+		transformer: (value) => {
+			if (value !== '0' && value !== '1') throw new InvalidArgumentError('expected 0 or 1');
+			return value;
 		}
 	},
 	{

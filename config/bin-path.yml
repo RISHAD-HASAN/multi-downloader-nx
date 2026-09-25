@@ -1,3 +1,7 @@
+# External binaries: set a name on PATH, a full path, or a directory.
+# Values may use $HOME, ${HOME}, %USERPROFILE% or ~. Specific environment
+# variables (FFMPEG_PATH, MKVMERGE_PATH, MP4DECRYPT_PATH, SHAKA_PATH) override
+# these settings; BIN_PATH/BIN_DIR can point to a shared binary directory.
 ffmpeg: 'ffmpeg.exe'
 mkvmerge: 'mkvmerge.exe'
 mp4decrypt: 'mp4decrypt.exe'

@@ -1,3 +1,4 @@
+import { console } from './log';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ArgvType } from './module.app-args';
@@ -134,6 +135,7 @@ const makeCommand = (service: 'crunchy' | 'hidive' | 'adn'): Partial<ArgvType>[]
 	const data = loadData();
 	const ret: Partial<ArgvType>[] = [];
 	const kind = data[service];
+	if (!kind) return ret;
 	for (const type of Object.keys(kind)) {
 		const item = kind[type as 's']; // 'srz' is also possible but will be ignored for the compiler
 		item.forEach((i) =>
@@ -158,7 +160,24 @@ const makeCommand = (service: 'crunchy' | 'hidive' | 'adn'): Partial<ArgvType>[]
 };
 
 const loadData = (): DataType => {
-	if (fs.existsSync(archiveFile)) return JSON.parse(fs.readFileSync(archiveFile).toString()) as DataType;
+	if (fs.existsSync(archiveFile)) {
+		try {
+			const parsed = JSON.parse(fs.readFileSync(archiveFile, 'utf8'));
+			if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid archive data');
+			return parsed as DataType;
+		} catch {
+			console.warn('[Archive] Corrupt archive.json; preserving it and starting a new archive.');
+			try {
+				const backupBase = `${archiveFile}.corrupt.${Date.now()}`;
+				let backup = backupBase;
+				for (let index = 1; fs.existsSync(backup); index++) backup = `${backupBase}.${index}`;
+				fs.renameSync(archiveFile, backup);
+			} catch (error) {
+				console.error('[Archive] Could not back up the corrupt archive:', error);
+				throw error; // never overwrite an archive that could not be preserved
+			}
+		}
+	}
 	return {} as DataType;
 };
 

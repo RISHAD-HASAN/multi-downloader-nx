@@ -10,11 +10,14 @@ export type CrunchyDownloadOptions = {
 	vstream: keyof typeof CrunchyVideoPlayStreams;
 	astream: keyof typeof CrunchyAudioPlayStreams;
 	majin?: boolean;
+	cbr?: '0' | '1';
 	tsd?: boolean;
 	novids?: boolean;
 	noaudio?: boolean;
 	x: number;
 	q: number;
+	listFormats?: boolean;
+	F?: boolean;
 	fileName: string;
 	outputDir?: string;
 	numbers: number;
