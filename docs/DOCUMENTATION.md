@@ -208,6 +208,24 @@ Select a specific Crunchyroll video playback endpoint by device. androidtv provi
 | Crunchyroll | `--astream ${device}` | `string` | `No`| `--as` | [`androidtv`, `android`, `androidtab`, `none`] | `android`| `astream: ` |
 
 Select a specific Crunchyroll audio playback endpoint by device. android provides the best audio (192 kbps).
+#### `-F`, `--list-formats`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |
+| --- | --- | --- | --- | --- |
+| All | `-F` or `--list-formats` | `boolean` | `No` | `-F` |
+
+Show the available video and audio qualities without downloading, muxing, or recording the episode in the download archive. Crunchyroll also lists subtitles and estimated video sizes. An episode/season ID is still required.
+#### `--majin`
+| **Service** | **Usage** | **Type** | **Required** | **Default** |
+| --- | --- | --- | --- | --- |
+| Crunchyroll | `--majin` | `boolean` | `No` | `false` |
+
+Force Crunchyroll's Majin VBR DASH encode. If it does not exist for a particular dub, that dub falls back to the original stream. Without an override, the downloader automatically compares Majin, CBR 0 and CBR 1.
+#### `--cbr`
+| **Service** | **Usage** | **Type** | **Required** | **Default** |
+| --- | --- | --- | --- | --- |
+| Crunchyroll | `--cbr 0` or `--cbr 1` | `string` | `No` | automatic |
+
+Force CBR 0 (high-bitrate) or CBR 1 (standard) instead of the automatic stream comparison; takes precedence over `--majin`. An unavailable encode falls back to the original stream. Where a complete video file is accessible, its measured bitrate is shown; otherwise file sizes are estimates based on manifest bitrate and duration.
 #### `--tsd`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 

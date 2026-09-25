@@ -61,6 +61,47 @@ remote HTTP one. The SQLite layout matches devine's, so an existing
 Skipped: the bun migration and the lockfile deletion, the CI churn, and pcela's
 branch (110 commits, drags in an unrelated service and rewrites the arg parser).
 
+### Yurasubs comparison and update (2026-09-25)
+
+Both forks branch from `anidl/multi-downloader-nx` at `5021398`. At the time of
+this update, our `7289b36` had 27 commits not in Yurasubs' `41422ed`, and
+Yurasubs had 20 commits not in ours. Several older Yurasubs features had already
+been reimplemented here; these are **adapted ports**, not a merge that discards
+this fork's Rich console, key vaults, pnpm build, or tests.
+
+- Ported the newer Crunchyroll stream comparison from `1a099fe`, `a16a4cf`,
+  `88c9973`, `5daabd5`, and `ea46829`: evaluate Majin VBR against CBR 0/1,
+  probe whole-file size and actual bitrate for SegmentBase video, show duration
+  and estimated quality/download sizes, and accept `--cbr 0|1` (higher priority
+  than `--majin`). Selection is **per dub**; missing encodes fall back cleanly.
+  The URL transforms ignore HLS and are idempotent.
+- Completed the earlier `fad4424` `-F/--list-formats` port. The flag was already
+  declared, but none of the three services acted on it; it now lists formats
+  without downloading, muxing or marking an episode downloaded.
+- Brought in the safe parts of `7d745da`/`23cb208`: remove the hard-coded
+  Crunchyroll `Host` header, fall back between CMS and content APIs on 403,
+  support direct binary-path environment variables and `BIN_DIR`/`PATH/bin`.
+  **Did not** adopt upstream's global TLS-verification bypass.
+- Adapted safe, non-GUI fixes from `4ae07eb`: filename overrides no longer
+  mutate variables across episodes; ADN uses secure random bytes and accepts
+  malformed cookie values; time formatting handles rounding; ffmpeg maps the
+  chapter input after subtitles and skips missing files on cleanup. Shell-free
+  subprocess execution retains this fork's quiet Rich live view; zipping also
+  invokes `7z` without a shell, and updater metadata uses an absolute path.
+  A damaged download archive is backed up instead of being silently overwritten
+  or preventing future downloads.
+- Kept pnpm and the custom console/GUI intact. Adapted `beca745` lint rules
+  for intentional test/preview logging and ANSI escape-code expressions, so
+  the existing lint command passes without changing rendering behavior.
+- Upstream's `41422ed` is a documentation/version bump; our package was already
+  at 5.8.2, so only the new options were documented here.
+
+Kept separate: upstream's bun/GUI migration, GitHub Actions release/CI workflows
+(which this fork intentionally removed), and unrelated GUI changes. Copying those
+commits wholesale would replace local functionality instead of integrating it.
+The comparisons and parser run against offline MPD fixtures in `tests/majin.test.ts`;
+live streaming still requires a valid service account.
+
 Some of these needed fixing before they'd work:
 
 - erolus77 declared `signSubsForced?: argv.signSubsForced`, which isn't valid TS
@@ -106,8 +147,10 @@ number of live connections against a CDN that already throttles at higher
 pnpm test:all
 ```
 
-Eight suites: `vault`, `console`, `build`, `download-ui`, `error`, `majin`,
-`filename`, `listing`. They cover the vault round-trip and PSSH parsing, the
-console renderer (including `%s` formatting and CJK widths), the packaged-build
-config manifest, the live-view wiring, error unwrapping against real undici
-failures, the majin URL rules, filename rules and the listing modes.
+Eleven suites: `vault`, `console`, `build`, `download-ui`, `error`, `majin`,
+`bin`, `upstream`, `archive`, `filename`, `listing`. They cover vault round-trips
+and PSSH parsing, the console renderer (including `%s` formatting and CJK
+widths), the packaged-build config manifest, live-view wiring, error unwrapping
+against real undici failures, offline Majin/CBR comparisons, binary discovery,
+format-only exits, CMS/content-API fallbacks, corrupt-archive recovery, filename
+rules, and listing modes.

@@ -25,6 +25,7 @@ updates.json
 *_profile.yml
 *_sess.yml
 archive.json
+archive.json.corrupt.*
 guistate.json
 fonts
 .webpack/

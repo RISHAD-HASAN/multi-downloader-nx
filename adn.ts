@@ -106,12 +106,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 	}
 
 	private generateRandomString(length: number) {
-		const characters = '0123456789abcdef';
-		let result = '';
-		for (let i = 0; i < length; i++) {
-			result += characters.charAt(Math.floor(Math.random() * characters.length));
-		}
-		return result;
+		return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
 	}
 
 	private parseCookies(cookiesString: string | null): Record<string, string> {
@@ -120,7 +115,12 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			cookiesString.split(';').forEach((cookie) => {
 				const parts = cookie.split('=');
 				const name = parts.shift()?.trim();
-				const value = decodeURIComponent(parts.join('='));
+				let value = parts.join('=');
+				try {
+					value = decodeURIComponent(value);
+				} catch {
+					// Retain malformed cookie values instead of aborting authentication.
+				}
 				if (name) {
 					cookies[name] = value;
 				}
@@ -468,6 +468,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			console.error('Failed to download media list');
 			return { isOk: false, reason: new Error('Failed to download media list') };
 		} else {
+			if (options.listFormats || options.F) return { isOk: true, value: undefined };
 			if (!options.skipmux) {
 				await this.muxStreams(res.data, { ...options, output: res.fileName });
 			} else {
@@ -732,6 +733,10 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 					const selPlUrl = plSelectedList[plQuality.map((a) => a.dim)[quality - 1]] ? plSelectedList[plQuality.map((a) => a.dim)[quality - 1]] : '';
 					console.info(`Servers available:\n\t${plServerList.join('\n\t')}`);
 					console.info(`Available qualities:\n\t${plQuality.map((a, ind) => `[${ind + 1}] ${a.str}`).join('\n\t')}`);
+
+					if (options.listFormats || options.F) {
+						return { data: [], fileName: '', error: false };
+					}
 
 					if (selPlUrl != '') {
 						variables.push(

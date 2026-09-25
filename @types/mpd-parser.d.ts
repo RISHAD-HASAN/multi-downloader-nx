@@ -97,5 +97,5 @@ declare module 'mpd-parser' {
 			};
 		};
 	};
-	export function parse(manifest: string): Manifest;
+	export function parse(manifest: string, options?: { manifestUri?: string }): Manifest;
 }

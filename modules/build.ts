@@ -4,7 +4,7 @@ import fs from 'fs';
 import pkg from '../package.json';
 import modulesCleanup from 'removeNPMAbsolutePaths';
 import { exec } from '@yao-pkg/pkg';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { console } from './log';
 import esbuild from 'esbuild';
 import path from 'path';
@@ -121,7 +121,7 @@ async function buildBinary(buildType: BuildTypes, gui: boolean) {
 
 	// Zipping
 	console.info(`[Zip] Zipping build...`);
-	execSync(`7z a -t7z "${buildsDir}/${buildFull}.7z" "${buildDir}"`, { stdio: [0, 1, 2] });
+	execFileSync('7z', ['a', '-t7z', `${buildsDir}/${buildFull}.7z`, buildDir], { stdio: [0, 1, 2] });
 	console.info(`[Zip] Zipping completed`);
 
 	// Checksum

@@ -185,26 +185,117 @@ const loadBinCfg = async () => {
 		mp4decrypt: 'mp4decrypt',
 		shaka: 'shaka-packager'
 	};
+	const binEnvMap: Record<keyof typeof defaultBin, string[]> = {
+		ffmpeg: ['FFMPEG_PATH', 'FFMPEG_BIN', 'FFMPEG', 'BIN_FFMPEG'],
+		mkvmerge: ['MKVMERGE_PATH', 'MKVMERGE_BIN', 'MKVMERGE', 'BIN_MKVMERGE'],
+		mp4decrypt: ['MP4DECRYPT_PATH', 'MP4DECRYPT_BIN', 'MP4DECRYPT', 'BIN_MP4DECRYPT'],
+		shaka: ['SHAKA_PACKAGER_PATH', 'SHAKA_PATH', 'SHAKA_PACKAGER_BIN', 'SHAKA_BIN', 'SHAKA', 'BIN_SHAKA']
+	};
+
+	const binDirEnv = getEnv('BIN_PATH') || getEnv('BIN_DIR');
+	const resolvedBinDir = binDirEnv ? resolveEnv(binDirEnv) : undefined;
+
 	const keys = Object.keys(defaultBin) as (keyof typeof defaultBin)[];
 	for (const dir of keys) {
-		if (!Object.prototype.hasOwnProperty.call(binCfg, dir) || typeof binCfg[dir] != 'string') {
-			binCfg[dir] = defaultBin[dir];
+		// 1. Look for specific environment variable for this binary
+		let envBinary: string | undefined;
+		for (const envKey of binEnvMap[dir]) {
+			const val = getEnv(envKey);
+			if (val && typeof val === 'string' && val.trim() !== '') {
+				envBinary = val.trim();
+				break;
+			}
 		}
-		// Expand %VAR% / ${VAR} / $VAR / ~ before any path resolution (fork: Yurasubs)
-		binCfg[dir] = resolveEnv(binCfg[dir] as string);
-		if ((binCfg[dir] as string).match(/^\${wdir}/)) {
-			binCfg[dir] = (binCfg[dir] as string).replace(/^\${wdir}/, '');
-			binCfg[dir] = path.join(workingDir, binCfg[dir] as string);
+
+		// 2. Config file entry
+		const hasConfigEntry = Object.prototype.hasOwnProperty.call(binCfg, dir) && typeof binCfg[dir] === 'string' && (binCfg[dir] as string).trim() !== '';
+		const configuredVal = hasConfigEntry ? (binCfg[dir] as string).trim() : undefined;
+
+		// Precedence: environment variable > config file entry > default
+		let target = envBinary ? envBinary : configuredVal ? configuredVal : defaultBin[dir];
+
+		// Expand environment variables (e.g. %LOCALAPPDATA%, %USERPROFILE%, %FFMPEG_PATH%, etc.)
+		target = resolveEnv(target);
+
+		// Handle ${wdir} placeholder
+		if (target.match(/^\${wdir}/)) {
+			target = target.replace(/^\${wdir}/, '');
+			target = path.join(workingDir, target);
 		}
-		if (!path.isAbsolute(binCfg[dir] as string)) {
-			binCfg[dir] = path.join(workingDir, binCfg[dir] as string);
+
+		// If target points to an existing directory, append binary name
+		if (fs.existsSync(target)) {
+			try {
+				if (fs.statSync(target).isDirectory()) {
+					const winTarget = path.join(target, `${defaultBin[dir]}.exe`);
+					const unixTarget = path.join(target, defaultBin[dir]);
+					if (process.platform === 'win32' && fs.existsSync(winTarget)) {
+						target = winTarget;
+					} else if (fs.existsSync(unixTarget)) {
+						target = unixTarget;
+					} else {
+						target = process.platform === 'win32' ? winTarget : unixTarget;
+					}
+				}
+			} catch {
+				// Ignore filesystem access errors
+			}
 		}
-		binCfg[dir] = await lookpath(binCfg[dir] as string);
-		binCfg[dir] = binCfg[dir] ? binCfg[dir] : undefined;
-		if (!binCfg[dir]) {
+
+		let resolved: string | undefined;
+
+		// If target is an absolute path or existing path
+		if (path.isAbsolute(target) || fs.existsSync(target)) {
+			resolved = (await lookpath(target)) || (fs.existsSync(target) ? target : undefined);
+		} else {
+			// Check relative to workingDir
+			const inWorkingDir = path.join(workingDir, target);
+			resolved = (await lookpath(inWorkingDir)) || (fs.existsSync(inWorkingDir) ? inWorkingDir : undefined);
+
+			// Check in custom BIN_PATH / BIN_DIR if provided
+			if (!resolved && resolvedBinDir) {
+				const inBinDir = path.join(resolvedBinDir, target);
+				resolved = (await lookpath(inBinDir)) || (fs.existsSync(inBinDir) ? inBinDir : undefined);
+			}
+
+			// Search system PATH with target
+			if (!resolved) {
+				resolved = await lookpath(target);
+			}
+		}
+
+		// Fallback: check custom BIN_PATH / BIN_DIR with default binary name
+		if (!resolved && resolvedBinDir) {
+			const defaultInBinDir = path.join(resolvedBinDir, defaultBin[dir]);
+			const defaultInBinDirWin = path.join(resolvedBinDir, `${defaultBin[dir]}.exe`);
+			resolved = (await lookpath(defaultInBinDir)) || (process.platform === 'win32' ? await lookpath(defaultInBinDirWin) : undefined);
+		}
+
+		// Fallback: search system PATH with default binary name
+		if (!resolved) {
 			const binFile = await lookpath(path.basename(defaultBin[dir]));
-			binCfg[dir] = binFile ? binFile : binCfg[dir];
+			resolved = binFile ? binFile : undefined;
 		}
+
+		// Fallback: search in bin/ subdirectories of system PATH
+		if (!resolved) {
+			const pathEnv = getEnv('PATH') || '';
+			const sep = process.platform === 'win32' ? ';' : ':';
+			const pathDirs = pathEnv.split(sep).filter(Boolean);
+			for (const p of pathDirs) {
+				const candWin = path.join(p, 'bin', `${defaultBin[dir]}.exe`);
+				const candUnix = path.join(p, 'bin', defaultBin[dir]);
+				if (process.platform === 'win32' && fs.existsSync(candWin)) {
+					resolved = candWin;
+					break;
+				} else if (fs.existsSync(candUnix)) {
+					resolved = candUnix;
+					break;
+				}
+			}
+		}
+
+		binCfg[dir] = resolved;
 	}
 	return binCfg;
 };

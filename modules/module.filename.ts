@@ -71,7 +71,7 @@ const parseFileName = (input: string, variables: Variable[], numbers: number, ov
 };
 
 const parseOverride = (variables: Variable[], override: string[]): Variable<string>[] => {
-	const vars: Variable<string>[] = variables;
+	const vars: Variable<string>[] = variables.map((v) => ({ ...v }));
 	override.forEach((item) => {
 		const index = item.indexOf('=');
 		if (index === -1) return logError(item, 'invalid');
@@ -96,7 +96,7 @@ const parseOverride = (variables: Variable[], override: string[]): Variable<stri
 		}
 	});
 
-	return variables;
+	return vars;
 };
 
 const logError = (override: string, reason: 'invalid' | 'wrongType') => {
