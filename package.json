@@ -52,7 +52,7 @@
 		"mediainfo.js": "^0.3.7",
 		"mpd-parser": "^1.4.0",
 		"node-playready": "^1.1.5",
-		"open": "^11.0.0",
+		"open": "^11.0.4",
 		"undici": "^8.7.0",
 		"widevine": "^1.0.7",
 		"ws": "^8.21.0",
