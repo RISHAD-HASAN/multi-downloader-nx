@@ -1,7 +1,5 @@
-// Regression tests for the console renderer.
-// The rich console replaced log4js, so it must preserve `util.format`
-// substitution (`%s`, `%d`, …) used by ~29 existing call sites, plus markup,
-// wrapping and colour-disabling behaviour.
+// Console renderer: util.format parity with the replaced log4js logger, markup,
+// wrapping, CJK width, colour-disabling and DRM masking.
 import assert from 'assert';
 import { cekTree } from '../modules/module.console';
 import { RichConsole, Text, Tree, Padding, Table, stripAnsi, stripMarkup, renderMarkup, setTheme, theme, textWidth } from '../modules/module.rich';
@@ -16,7 +14,7 @@ function capture(fn: (c: RichConsole) => void, opts: any = {}): string {
 
 setTheme('catppuccin-mocha');
 
-// ── 1. util.format parity with the old log4js logger ───────────────────────
+// util.format parity with the old log4js logger
 {
 	const t = capture((c) => {
 		c.info('Your Country: %s', 'BD');
@@ -33,7 +31,7 @@ setTheme('catppuccin-mocha');
 	console.log('✓ util.format substitution (%s/%d/%i, multi-arg, objects)');
 }
 
-// ── 2. Errors render with their stack ──────────────────────────────────────
+// Errors render with their stack
 {
 	const t = capture((c) => c.error(new Error('boom')));
 	assert.ok(t.includes('Error: boom'), 'error message missing');
@@ -41,7 +39,7 @@ setTheme('catppuccin-mocha');
 	console.log('✓ Error objects render with level label and stack');
 }
 
-// ── 3. Log levels filter correctly ─────────────────────────────────────────
+// Log level filtering
 {
 	const t = capture((c) => {
 		c.level = 'warning';
@@ -55,7 +53,7 @@ setTheme('catppuccin-mocha');
 	console.log('✓ log level filtering');
 }
 
-// ── 4. Markup: known tags style, unknown tags stay literal ─────────────────
+// Markup: known tags style, unknown tags stay literal
 {
 	assert.strictEqual(stripMarkup('[cyan]hi[/]'), 'hi');
 	// tags aniDL already prints in real log lines must survive untouched
@@ -68,7 +66,7 @@ setTheme('catppuccin-mocha');
 	console.log('✓ markup: styled tags applied, unknown/bracketed text preserved');
 }
 
-// ── 5. Colour can be fully disabled ────────────────────────────────────────
+// Colour can be disabled entirely
 {
 	const prev = theme.enabled;
 	theme.enabled = false;
@@ -79,7 +77,7 @@ setTheme('catppuccin-mocha');
 	console.log('✓ colour disabling produces clean plain text');
 }
 
-// ── 6. Wrapping keeps a hanging indent and never exceeds the width ─────────
+// Wrapping keeps a hanging indent and never exceeds the width
 {
 	const long = 'lorem ipsum dolor sit amet '.repeat(12);
 	const t = capture((c) => c.info(long), { width: 60 });
@@ -90,7 +88,7 @@ setTheme('catppuccin-mocha');
 	console.log('✓ wrapping respects width and hanging indent');
 }
 
-// ── 7. Renderables produce bounded output ──────────────────────────────────
+// Renderables stay within the console width
 {
 	const tree = new Tree('', { hideRoot: true });
 	const b = tree.add('[repr.number]2[/] Videos');
@@ -110,7 +108,7 @@ setTheme('catppuccin-mocha');
 	console.log('✓ tree/grid/rule render within the console width');
 }
 
-// ── 8. CJK width accounting ────────────────────────────────────────────────
+// CJK width accounting
 {
 	assert.strictEqual(textWidth('葬送のフリーレン'), 16, 'CJK glyphs must count as 2 columns');
 	assert.strictEqual(textWidth('abc'), 3);

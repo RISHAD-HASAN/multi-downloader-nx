@@ -1,11 +1,7 @@
-// End-to-end DUAL tag check: runs the real downloadMediaList() for one episode
-// with two dubs (Japanese + English) against a stubbed network.
-//
-// Guards the report "no dual tag even after downloading two audios": the tag
-// only reaches a filename through the ${audio} variable, so a template without
-// it used to drop the tag without a word. Both halves are covered here - the
-// tag lands in the name when the template asks for it, and the run explains
-// itself when it cannot.
+// End-to-end DUAL tag check: the real downloadMediaList() for one episode with two
+// dubs (Japanese + English) against a stubbed network. The tag only reaches a
+// filename through the ${audio} variable, so both halves are covered: it lands in
+// the name when the template asks for it, and the run says so when it cannot.
 
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -181,7 +177,7 @@ async function main() {
 		eng: langsData.languages.find((l) => l.code === 'eng')!
 	};
 
-	// ── a template with ${audio} gets the DUAL tag ─────────────────────────────
+	// template with ${audio}: tag lands in the name
 	const withTag = await create().downloadMediaList(
 		episode(langs),
 		options('${seriesTitle}.S${season}E${episode}.${title}.${height}p.CR.WEB.DL.${audio}AAC2.0.H.264.S3NKU') as any
@@ -198,7 +194,7 @@ async function main() {
 	);
 	console.log('✓ two completed dubs add the DUAL tag through ${audio}');
 
-	// ── a template without ${audio} says so instead of dropping it silently ───
+	// template without ${audio}: the run reports the skipped tag
 	notices.length = 0;
 	const withoutTag = await create().downloadMediaList(episode(langs), options('${seriesTitle}.S${season}E${episode}.${title}.${height}p.CR.WEB.DL.AAC2.0.H.264.S3NKU') as any);
 	assert.deepEqual(
