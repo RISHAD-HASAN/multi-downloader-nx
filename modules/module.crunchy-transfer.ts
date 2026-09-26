@@ -1,17 +1,14 @@
-// Concurrent DASH track bookkeeping for Crunchyroll downloads.
-//
-// The DASH video track and each audio dub are written to separate files, so
-// they can be transferred at the same time instead of one after the other.
-// The registry keeps per-track state while a batch is in flight, records which
-// audio tracks actually completed (used for the DUAL filename tag), and
-// surfaces the first transfer error only after every sibling has settled.
+// DASH track bookkeeping for Crunchyroll. Video and each audio dub go to separate
+// files, so they transfer concurrently; the registry tracks per-track state,
+// records which dubs completed (the DUAL filename tag), and reports the first
+// error once every sibling transfer has settled.
 
 export type DashTransferKind = 'video' | 'audio';
 
 export type DashTransferState = 'active' | 'completed' | 'failed';
 
 export interface DashTransferInfo {
-	// Stable key for the transfer, e.g. `video|<mediaId>` or `audio-eng|<mediaId>`
+	// `video|<mediaId>` or `audio-eng|<mediaId>`
 	key: string;
 	kind: DashTransferKind;
 	// Episode/version GUID the transfer belongs to
@@ -44,7 +41,7 @@ export class DashTransferRegistry {
 		return this.transfers.get(key);
 	}
 
-	// Transfers that are still running
+	// Still running
 	public pending(): DashTransferInfo[] {
 		return this.list().filter((info) => this.inflight.has(info.key));
 	}
@@ -53,8 +50,8 @@ export class DashTransferRegistry {
 		return this.inflight.size > 0;
 	}
 
-	// Language codes of audio transfers that finished successfully. A failed
-	// dub must never count towards the DUAL tag.
+	// Languages of the dubs that finished; a failed dub must not count towards
+	// the DUAL tag.
 	public completedAudioLangCodes(mediaId?: string): string[] {
 		const codes = this.list()
 			.filter((info) => info.kind === 'audio' && info.state === 'completed' && (mediaId === undefined || info.mediaId === mediaId))
@@ -63,8 +60,7 @@ export class DashTransferRegistry {
 		return [...new Set(codes)];
 	}
 
-	// Start one transfer and track it until it settles. The returned promise
-	// rejects with the task error so callers can await a single track.
+	// Run one transfer, tracking its state. Rejects with the task error.
 	public run(entry: DashTransferTask): Promise<void> {
 		const info: DashTransferInfo = {
 			key: entry.key,
@@ -92,10 +88,9 @@ export class DashTransferRegistry {
 		return promise;
 	}
 
-	// Start every transfer concurrently, wait for all of them to settle, then
-	// rethrow the first failure - mirroring the old sequential behaviour where
-	// a rejected download aborts the episode, without abandoning a sibling
-	// transfer that is still writing to disk.
+	// Start every transfer at once, wait for all of them to settle, then rethrow
+	// the first failure: one dead track aborts the episode without abandoning a
+	// sibling that is still writing to disk.
 	public async runAll(entries: DashTransferTask[]): Promise<void> {
 		if (entries.length === 0) return;
 		const settled = await Promise.allSettled(entries.map((entry) => this.run(entry)));
@@ -103,7 +98,7 @@ export class DashTransferRegistry {
 		if (failure) throw failure.reason;
 	}
 
-	// Drop bookkeeping for one episode, or for all episodes when no id is given
+	// Drop bookkeeping for one episode, or for all of them when no id is given
 	public clear(mediaId?: string): void {
 		for (const [key, info] of this.transfers) {
 			if (mediaId === undefined || info.mediaId === mediaId) this.transfers.delete(key);
@@ -111,38 +106,38 @@ export class DashTransferRegistry {
 	}
 }
 
-// Minimal shape of the downloaded-file entries the audio tag is derived from
+// The bits of a downloaded-file entry the audio tag is derived from
 type TaggedFile = {
 	type: string;
 	lang?: { code: string };
 };
 
-// Minimal shape of the ${audio} filename variable
+// The ${audio} filename variable
 type AudioTagVariable = {
 	name: string;
 	type: string;
 	replaceWith: string | number;
 };
 
-// Distinct audio languages that actually finished downloading. DASH episodes
-// produce a separate Audio file per dub; the HLS fallback muxes audio into the
-// video, so distinct Video languages are used when no Audio files exist.
+// Distinct audio languages that finished downloading. DASH episodes produce one
+// Audio file per dub; the HLS fallback muxes audio into the video, so distinct
+// Video languages stand in when there are no Audio files.
 export const completedAudioLanguages = (files: TaggedFile[]): string[] => {
 	const audio = files.filter((file) => file.type === 'Audio' && file.lang?.code);
 	const source = audio.length > 0 ? audio : files.filter((file) => file.type === 'Video' && file.lang?.code);
 	return [...new Set(source.map((file) => file.lang!.code))];
 };
 
-// DUAL only when more than one audio track completed: a failed second dub must
-// not leave the tag in the final filename.
+// DUAL only when more than one dub completed: a failed second dub must not leave
+// the tag in the final filename.
 export const actualAudioTag = (files: TaggedFile[]): string => (completedAudioLanguages(files).length > 1 ? 'DUAL.' : '');
 
-// `${audio}` is only substituted when the filename template asks for it, so a
+// `${audio}` is substituted only when the filename template asks for it, so a
 // template without it has nowhere to put the tag.
 export const templateHasAudioTag = (template: string | undefined): boolean => /\$\{audio\}/.test(template ?? '');
 
-// Rewrite the ${audio} variable(s) in place, seeding one when the template asks
-// for it but the download path never did. Returns true when the variable list
+// Rewrite the ${audio} variable in place, seeding one when the template asks for
+// it but the download path never created it. Returns true when the variable list
 // changed, i.e. the caller has to rebuild the filename.
 export const applyActualAudioTag = (variables: AudioTagVariable[], files: TaggedFile[], template?: string): boolean => {
 	const tag = actualAudioTag(files);
@@ -163,9 +158,8 @@ export const applyActualAudioTag = (variables: AudioTagVariable[], files: Tagged
 	return changed;
 };
 
-// One-line report of what the DUAL tag ended up as, so a skipped tag is never a
-// mystery. Returns nothing for the ordinary case: a single dub that never asked
-// for the tag in the first place.
+// One-line report of how the DUAL tag turned out, so a skipped tag is never a
+// mystery. Returns nothing for a single dub that never asked for the tag.
 export const audioTagNotice = (files: TaggedFile[], template: string | undefined, requestedDual: boolean): { level: 'info' | 'warn'; message: string } | undefined => {
 	const langs = completedAudioLanguages(files);
 	if (langs.length > 1) {

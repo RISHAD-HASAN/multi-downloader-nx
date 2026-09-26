@@ -225,10 +225,9 @@ class Merger {
 		return args.join(' ');
 	}
 
-	// Index of the audio stream that should carry the "default" disposition when
-	// muxing with FFmpeg: the first track matching the configured default audio
-	// language, in mapping order (videoAndAudio tracks first, then onlyAudio
-	// tracks). Returns -1 when no track matches.
+	// Index of the audio stream that should carry the "default" disposition under
+	// FFmpeg: the first track matching the configured default language, in mapping
+	// order (videoAndAudio first, then onlyAudio). -1 when nothing matches.
 	public defaultAudioIndex(): number {
 		const wanted = this.options.defaults?.audio?.code;
 		if (!wanted) return -1;
@@ -478,7 +477,7 @@ class Merger {
 		} else {
 			console.debug(`[${type} Done]`);
 		}
-		// Final, single line the user actually cares about
+		// The one line that matters
 		console.print(new Padding(`[green]${this.options.output}[/] [text2]done[/]`, [1, 0, 1, 5]));
 	}
 

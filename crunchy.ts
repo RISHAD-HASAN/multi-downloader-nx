@@ -89,8 +89,8 @@ export default class Crunchy implements ServiceClass {
 		cms_beta?: Record<string, string>;
 		cms_web?: Record<string, string>;
 	} = {};
-	// In-flight DASH track transfers. The video track and every audio dub are
-	// written to separate files, so they are downloaded concurrently as a batch.
+	// In-flight DASH transfers: video and every audio dub go to separate files,
+	// so they run as one concurrent batch.
 	private pendingDashTransfers = new DashTransferRegistry();
 
 	constructor(private debug = false) {
@@ -100,8 +100,7 @@ export default class Crunchy implements ServiceClass {
 		this.locale = 'en-US';
 	}
 
-	// DRM precondition, kept as a method so the download flow can also be driven
-	// without a CDM installed (tests, GUI dry runs).
+	// DRM precondition. A method so tests can drive the download flow without a CDM.
 	protected cdmAvailable(): boolean {
 		return canDecrypt;
 	}
@@ -148,8 +147,8 @@ export default class Crunchy implements ServiceClass {
 			await this.doSearch({ ...argv, search: argv.search as string });
 		} else if (argv.series && argv.series.match(/^[0-9A-Z]{9,}$/)) {
 			await this.refreshToken();
-			// --srz alone lists the seasons; once -s narrows it down the season list
-			// is just noise, so only the episode list is shown.
+			// --srz alone lists seasons; with -s the season list is noise, so only the
+			// episode list is shown.
 			if (!argv.s) await this.logSeriesById(argv.series as string);
 			const selected = await this.downloadFromSeriesID(argv.series, { ...argv });
 			if (selected.isOk) {
@@ -3258,11 +3257,9 @@ export default class Crunchy implements ServiceClass {
 		if (dlFailed) console.warn('[MDNX] Some stream downloads or decryption failed.');
 		else console.info('[green][MDNX] All stream downloads & decryption completed.[/]');
 
-		// The ${audio} variable is seeded from the requested dubs; base the final
-		// filename on the audio tracks that actually completed instead, so a
-		// failed second dub does not keep "DUAL." in the name. A template without
-		// ${audio} has nowhere to put the tag, so that is reported rather than
-		// silently dropped.
+		// Rebuild ${audio} from the dubs that actually completed, so a failed second
+		// dub does not keep "DUAL." in the name. A template without ${audio} has
+		// nowhere to put the tag; that gets reported instead of dropped.
 		if (files.some((file) => file.type === 'Audio' || file.type === 'Video')) {
 			const requestedDual = variables.some((variable) => variable.name === 'audio' && variable.replaceWith === 'DUAL.');
 			if (applyActualAudioTag(variables, files, options.fileName) && fileName) {

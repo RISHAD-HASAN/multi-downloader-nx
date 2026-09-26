@@ -470,15 +470,12 @@ const getState = (): GuiState => {
 	}
 };
 
-/**
- * Load config/vaults.yml. Absent file means we still want a local vault.
- * Returns an empty list when the file is absent so vaults stay opt-in.
- */
+// Load config/vaults.yml. An absent file yields an empty list, so vaults stay
+// opt-in.
 const loadVaultCfg = (): { key_vaults?: VaultConfig[]; enabled?: boolean } => {
 	const cfg = loadYamlCfgFile<{ key_vaults?: VaultConfig[]; enabled?: boolean }>(vaultCfgFile);
-	// If config/vaults.yml is missing entirely (older packaged build, or the user
-	// deleted it) fall back to a local SQLite vault instead of silently disabling
-	// content key caching.
+	// No vaults.yml (older build, or the user deleted it): fall back to a local
+	// SQLite vault rather than silently disabling key caching.
 	if (!cfg || Object.keys(cfg).length === 0) {
 		return {
 			enabled: true,

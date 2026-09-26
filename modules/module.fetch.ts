@@ -145,7 +145,7 @@ export class Req {
 			} & TypeError & {
 					res: Response;
 				};
-			// undici hides the real reason in a nested `cause` chain
+			// undici hides the real reason in a nested cause chain
 			if (!params.silent) {
 				if (error.res && error.res.status && error.res.statusText) {
 					console.error(`${error.name} ${error.res.status}: ${error.res.statusText}`);
