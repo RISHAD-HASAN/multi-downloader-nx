@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { actualAudioTag, applyActualAudioTag, completedAudioLanguages, DashTransferRegistry } from '../modules/module.crunchy-transfer';
+import { actualAudioTag, applyActualAudioTag, audioTagNotice, completedAudioLanguages, DashTransferRegistry, templateHasAudioTag } from '../modules/module.crunchy-transfer';
 
 const lang = (code: string) => ({ code, name: code.toUpperCase(), locale: code });
 const audioFile = (code: string) => ({ type: 'Audio', lang: lang(code), path: `${code}.audio.m4s` });
@@ -147,7 +147,33 @@ function testApplyAudioTag() {
 	assert.equal(variables[2].replaceWith, 1);
 	assert.equal(applyActualAudioTag(variables, [audioFile('eng'), audioFile('spa')]), true);
 	assert.equal(variables[1].replaceWith, 'DUAL.', 'a completed second dub upgrades the tag again');
-	console.log('✓ the ${audio} filename variable is rewritten in place and only when it changes');
+
+	// A template that asks for ${audio} still gets a value when the download path
+	// never seeded one (template-only callers, HLS fallback).
+	assert.equal(templateHasAudioTag('${title}.${audio}x264'), true);
+	assert.equal(templateHasAudioTag('${title}.x264'), false);
+	const empty: { name: string; type: string; replaceWith: string | number }[] = [];
+	assert.equal(
+		applyActualAudioTag(empty, [audioFile('eng'), audioFile('spa')], '${title}.${audio}x264'),
+		true,
+		'a missing ${audio} variable must be seeded when the template asks for it'
+	);
+	assert.deepEqual(empty, [{ name: 'audio', type: 'string', replaceWith: 'DUAL.' }]);
+	const untouched: { name: string; type: string; replaceWith: string | number }[] = [];
+	assert.equal(applyActualAudioTag(untouched, [audioFile('eng'), audioFile('spa')], '${title}.x264'), false, 'a template without ${audio} has nowhere to seed');
+	assert.deepEqual(untouched, []);
+
+	// The tag outcome is always reported, so a skipped DUAL cannot go unnoticed.
+	assert.deepEqual(audioTagNotice([audioFile('eng'), audioFile('spa')], '${title}.${audio}x264', false), {
+		level: 'info',
+		message: 'Audio: eng + spa - DUAL tag added to the filename'
+	});
+	const skipped = audioTagNotice([audioFile('eng'), audioFile('spa')], '${title}.x264', false);
+	assert.equal(skipped?.level, 'warn');
+	assert.ok(skipped?.message.includes('no ${audio}') && skipped?.message.includes('--fileName'));
+	assert.equal(audioTagNotice([audioFile('eng')], '${title}.${audio}x264', false), undefined, 'a lone requested dub is ordinary and stays quiet');
+	assert.equal(audioTagNotice([audioFile('eng')], '${title}.${audio}x264', true)?.level, 'info', 'a downgraded DUAL reports that one dub completed');
+	console.log('✓ the ${audio} filename variable is rewritten in place, seeded when missing, and always reported');
 }
 
 function testCrunchyWiring() {
@@ -157,8 +183,11 @@ function testCrunchyWiring() {
 	assert.ok(source.includes("await finishTrack('audio');"), 'audio must decrypt inside its own transfer');
 	assert.ok(source.includes('await Promise.all(videoJobs);'), 'video jobs must drain before returning');
 	assert.ok(source.includes('await Helper.decrypt(binary, args);'), 'decryption must not block network transfers');
-	assert.ok(source.includes('const actualAudioTag = completedAudioTag(files);'), 'the DUAL tag must be recomputed from completed audio');
-	assert.ok(source.includes('applyActualAudioTag(variables, files)'), 'the filename variable must be updated before the final name is built');
+	assert.ok(
+		source.includes('applyActualAudioTag(variables, files, options.fileName)'),
+		'the filename variable must be updated from completed audio before the final name is built'
+	);
+	assert.ok(source.includes('audioTagNotice(files, options.fileName, requestedDual)'), 'a skipped DUAL tag must be reported to the user');
 	console.log('✓ crunchy.ts wires concurrent DASH transfers and the completed-audio tag');
 }
 
@@ -170,7 +199,9 @@ async function testMergerDefaultAudio() {
 		const [{ default: Merger }, { languages }] = await Promise.all([import('../modules/module.merger'), import('../modules/module.langsData')]);
 		const { default: Helper } = await import('../modules/module.helper');
 		let ticked = false;
-		const timer = setTimeout(() => { ticked = true; }, 10);
+		const timer = setTimeout(() => {
+			ticked = true;
+		}, 10);
 		await Helper.decrypt(process.execPath, ['-e', 'setTimeout(() => {}, 80)']);
 		clearTimeout(timer);
 		assert.equal(ticked, true, 'decryption must leave the event loop available to downloads');

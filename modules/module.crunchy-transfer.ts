@@ -137,15 +137,45 @@ export const completedAudioLanguages = (files: TaggedFile[]): string[] => {
 // not leave the tag in the final filename.
 export const actualAudioTag = (files: TaggedFile[]): string => (completedAudioLanguages(files).length > 1 ? 'DUAL.' : '');
 
-// Rewrite the ${audio} variable(s) in place; returns true when any changed.
-export const applyActualAudioTag = (variables: AudioTagVariable[], files: TaggedFile[]): boolean => {
+// `${audio}` is only substituted when the filename template asks for it, so a
+// template without it has nowhere to put the tag.
+export const templateHasAudioTag = (template: string | undefined): boolean => /\$\{audio\}/.test(template ?? '');
+
+// Rewrite the ${audio} variable(s) in place, seeding one when the template asks
+// for it but the download path never did. Returns true when the variable list
+// changed, i.e. the caller has to rebuild the filename.
+export const applyActualAudioTag = (variables: AudioTagVariable[], files: TaggedFile[], template?: string): boolean => {
 	const tag = actualAudioTag(files);
 	let changed = false;
+	let seeded = false;
 	for (const variable of variables) {
-		if (variable.name === 'audio' && variable.type === 'string' && variable.replaceWith !== tag) {
+		if (variable.name !== 'audio') continue;
+		seeded = true;
+		if (variable.type === 'string' && variable.replaceWith !== tag) {
 			variable.replaceWith = tag;
 			changed = true;
 		}
 	}
+	if (!seeded && templateHasAudioTag(template)) {
+		variables.push({ name: 'audio', type: 'string', replaceWith: tag });
+		changed = true;
+	}
 	return changed;
+};
+
+// One-line report of what the DUAL tag ended up as, so a skipped tag is never a
+// mystery. Returns nothing for the ordinary case: a single dub that never asked
+// for the tag in the first place.
+export const audioTagNotice = (files: TaggedFile[], template: string | undefined, requestedDual: boolean): { level: 'info' | 'warn'; message: string } | undefined => {
+	const langs = completedAudioLanguages(files);
+	if (langs.length > 1) {
+		return templateHasAudioTag(template)
+			? { level: 'info', message: `Audio: ${langs.join(' + ')} - DUAL tag added to the filename` }
+			: {
+					level: 'warn',
+					message: `Audio: ${langs.join(' + ')} - DUAL tag skipped, the fileName template has no \${audio} variable; add \${audio} to --fileName or config/cli-defaults.yml`
+				};
+	}
+	if (requestedDual) return { level: 'info', message: `Audio: ${langs.join(' + ') || 'none'} - only one dub completed, no DUAL tag` };
+	return undefined;
 };

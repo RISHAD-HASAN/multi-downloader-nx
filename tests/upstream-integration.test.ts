@@ -36,7 +36,8 @@ import path from 'node:path';
 		);
 		assert.deepEqual(formats, { data: [], fileName: '', error: false });
 		const crunchySource = fs.readFileSync(path.join(__dirname, '..', 'crunchy.ts'), 'utf8');
-		assert.ok(crunchySource.includes('if (!options.listFormats && !options.F && !canDecrypt'), 'format listing should work without a CDM');
+		assert.ok(crunchySource.includes('if (!options.listFormats && !options.F && !this.cdmAvailable()'), 'format listing should work without a CDM');
+		assert.ok(crunchySource.includes('protected cdmAvailable(): boolean'), 'the CDM check must stay overridable so tests and dry runs do not need a CDM');
 		assert.ok(crunchySource.includes('if (!options.listFormats && !options.F && !this.cfg.bin.mp4decrypt'), 'format listing should work without a decryptor');
 		console.log('✓ format listing skips mux/archive in Crunchyroll and ADN, and bypasses CDM checks');
 

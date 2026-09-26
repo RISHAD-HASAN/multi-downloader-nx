@@ -141,6 +141,13 @@ Some of these needed fixing before they'd work:
   could pick the wrong dub. `Merger.defaultAudioIndex()` finds the stream that
   matches the configured default audio language, and FFmpeg gets
   `-disposition:a:N default` (and `0` on the rest) whenever there is a choice.
+- A filename template without `${audio}` dropped the `DUAL.` tag without a word:
+  the tag only reaches the name through that variable. `applyActualAudioTag` now
+  also seeds the variable when the template asks for it, and the end of a
+  download reports the tag - an info line when `DUAL.` was added, a warning with
+  the fix when two dubs completed but the template has no `${audio}`, and a note
+  when only one of the requested dubs finished. `${audio}` is now listed in the
+  documented template variables.
 
 ## Not done
 
@@ -158,12 +165,15 @@ A shared concurrency budget across dubs and episodes is still open.
 pnpm test:all
 ```
 
-Twelve suites: `vault`, `console`, `build`, `download-ui`, `error`, `majin`,
-`bin`, `upstream`, `archive`, `filename`, `listing`, `crunchy-concurrency`. They
+Thirteen suites: `vault`, `console`, `build`, `download-ui`, `error`, `majin`,
+`bin`, `upstream`, `archive`, `filename`, `listing`, `crunchy-concurrency`,
+`crunchy-dual-tag`. They
 cover vault round-trips and PSSH parsing, the console renderer (including `%s`
 formatting and CJK widths), the packaged-build config manifest, live-view
 wiring, error unwrapping against real undici failures, offline Majin/CBR
 comparisons, binary discovery, format-only exits, CMS/content-API fallbacks,
 corrupt-archive recovery, filename rules, listing modes, and the concurrent DASH
 transfer batch (track overlap, failure isolation, completed-audio DUAL tagging
-and FFmpeg default-audio dispositions).
+and FFmpeg default-audio dispositions), and the two-dub download flow end to end
+(the `DUAL.` tag landing through `${audio}`, and the warning when the template
+has no `${audio}`).
