@@ -50,7 +50,6 @@ export abstract class Vault {
 	abstract getServices(): Promise<string[]>;
 }
 
-
 type SqliteModule = {
 	DatabaseSync: new (path: string) => {
 		exec(sql: string): void;
@@ -125,9 +124,7 @@ export class SQLiteVault extends Vault {
 	async getKey(kid: string, service: string): Promise<string | undefined> {
 		const table = this.resolveTable(service);
 		if (!table) return undefined;
-		const row = this.connect()
-			.prepare(`SELECT key_ FROM "${table}" WHERE kid = ? AND key_ != ?`)
-			.get(normaliseKid(kid), NULL_KEY);
+		const row = this.connect().prepare(`SELECT key_ FROM "${table}" WHERE kid = ? AND key_ != ?`).get(normaliseKid(kid), NULL_KEY);
 		return row?.key_;
 	}
 
@@ -163,9 +160,7 @@ export class SQLiteVault extends Vault {
 	async getServices(): Promise<string[]> {
 		const db = this.connect();
 		if (!db) return [];
-		return (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as any[]).map(
-			(r) => r.name
-		);
+		return (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as any[]).map((r) => r.name);
 	}
 }
 
@@ -242,7 +237,6 @@ export class JSONVault extends Vault {
 		return Object.keys(this.load());
 	}
 }
-
 
 /**
  * HTTP/API vault - talks to a remote key store (the "API" vault format used by
@@ -326,7 +320,6 @@ export class APIVault extends Vault {
 	}
 }
 
-
 export interface VaultHit {
 	kid: string;
 	key: string;
@@ -401,7 +394,6 @@ export class Vaults {
 		return touched;
 	}
 }
-
 
 export interface VaultConfig {
 	type: 'SQLite' | 'JSON' | 'API' | 'HTTP';

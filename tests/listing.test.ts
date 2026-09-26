@@ -17,28 +17,18 @@ console.log('✓ account line shows username only');
 
 // ── a silent token refresh must not re-print the account line ──────────────
 assert.ok(
-	cr.includes("} else if (!silent) {\r\n\t\t\tconsole.info('USER: Anonymous');") ||
-		cr.includes("} else if (!silent) {\n\t\t\tconsole.info('USER: Anonymous');"),
+	cr.includes("} else if (!silent) {\r\n\t\t\tconsole.info('USER: Anonymous');") || cr.includes("} else if (!silent) {\n\t\t\tconsole.info('USER: Anonymous');"),
 	'the anonymous branch ignores `silent`, duplicating the USER line'
 );
 console.log('✓ anonymous branch honours the silent flag');
 
 // ── season list only when -s was not supplied ──────────────────────────────
-assert.ok(
-	/if \(!argv\.s\) await this\.logSeriesById/.test(cr),
-	'the season list is not gated on the absence of -s'
-);
+assert.ok(/if \(!argv\.s\) await this\.logSeriesById/.test(cr), 'the season list is not gated on the absence of -s');
 console.log('✓ season list hidden once -s narrows the request');
 
 // ── episode list only when -s given and -e absent ──────────────────────────
-assert.ok(
-	cr.includes('const showEpisodeList = Boolean(listingArgv.s) && !listingArgv.e;'),
-	'episode listing is not gated correctly'
-);
-assert.ok(
-	cr.includes('showEpisodeList ? sortedEpisodes : {}'),
-	'the episode loop does not honour showEpisodeList'
-);
+assert.ok(cr.includes('const showEpisodeList = Boolean(listingArgv.s) && !listingArgv.e;'), 'episode listing is not gated correctly');
+assert.ok(cr.includes('showEpisodeList ? sortedEpisodes : {}'), 'the episode loop does not honour showEpisodeList');
 assert.ok(/if \(sepArgv\.s && !sepArgv\.e\)/.test(cr), 'the --- separator is not tied to the episode list');
 console.log('✓ episode list + separator only for `--srz -s` without -e');
 

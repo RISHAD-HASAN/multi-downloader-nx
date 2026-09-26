@@ -25,37 +25,13 @@ import {
 	type RenderInput
 } from './module.rich';
 
-export {
-	BOX,
-	GradientBar,
-	Group,
-	Live,
-	Padding,
-	Panel,
-	Progress,
-	Rule,
-	Spinner,
-	Table,
-	Text,
-	Tree,
-	formatBytes,
-	formatDuration,
-	renderMarkup,
-	setTheme,
-	stripMarkup,
-	theme
-};
+export { BOX, GradientBar, Group, Live, Padding, Panel, Progress, Rule, Spinner, Table, Text, Tree, formatBytes, formatDuration, renderMarkup, setTheme, stripMarkup, theme };
 
 export const console_ = new RichConsole({ showTime: false, logPadding: [0, 5] });
 
-
-const ANIDL_ASCII = [
-	' ▄▄▄· ▐ ▄ ▪  ·▄▄▄▄  ▄▄▌  ',
-	'▐█ ▀█ •█▌▐███ ██▪ ██ ██•  ',
-	'▄█▀▀█ ▐█▐▐▌▐█·▐█· ▐█▌██▪  ',
-	'▐█ ▪▐▌██▐█▌▐█▌██. ██ ▐█▌▐▌',
-	' ▀  ▀ ▀▀ █▪▀▀▀▀▀▀▀▀• .▀▀▀ '
-].join('\n');
+const ANIDL_ASCII = [' ▄▄▄· ▐ ▄ ▪  ·▄▄▄▄  ▄▄▌  ', '▐█ ▀█ •█▌▐███ ██▪ ██ ██•  ', '▄█▀▀█ ▐█▐▐▌▐█·▐█· ▐█▌██▪  ', '▐█ ▪▐▌██▐█▌▐█▌██. ██ ▐█▌▐▌', ' ▀  ▀ ▀▀ █▪▀▀▀▀▀▀▀▀• .▀▀▀ '].join(
+	'\n'
+);
 
 /**
  * The centred ASCII banner + version line, mirroring unshackle's `__main__`.
@@ -66,16 +42,12 @@ export function printBanner(version: string, extra?: string) {
 		new Padding(
 			new Group(
 				new Text(ANIDL_ASCII, { style: 'ascii.art', justify: 'center' }),
-				new Text(
-					`v [repr.number]${version}[/]${extra ? ` (${extra})` : ''} - © 2021-${year} - github.com/anidl/multi-downloader-nx`,
-					{ justify: 'center' }
-				)
+				new Text(`v [repr.number]${version}[/]${extra ? ` (${extra})` : ''} - © 2021-${year} - github.com/anidl/multi-downloader-nx`, { justify: 'center' })
 			),
 			[1, 11, 1, 10]
 		)
 	);
 }
-
 
 // `console.print(Padding(Rule("[rule.text]…"), (1, 2)))`
 export function rule(title: string, pad: [number, number] | number = [1, 2]) {
@@ -94,7 +66,6 @@ export function listingPanel(items: RenderInput[], title: string): Panel {
 	for (const item of items) grid.addRow(item);
 	return new Panel(grid, { title: `[panel.title]${title}[/]`, box: BOX.ROUNDED, padding: [0, 1] });
 }
-
 
 export interface TrackLike {
 	type: 'Video' | 'Audio' | 'Subtitle' | 'Chapter' | 'Attachment';
@@ -222,7 +193,6 @@ class SingleTask {
 	}
 }
 
-
 /**
  * DRM status tree. Mask PSSH, KIDs and keys before rendering or file logging;
  * retain only the DRM type and vault attribution.
@@ -239,7 +209,6 @@ export function cekTree(drm: 'Widevine' | 'PlayReady' | 'ClearKey', _pssh: strin
 	}
 	return tree;
 }
-
 
 export function selectionCancelled() {
 	console_.print(new Padding(':x: Selection Cancelled...', [0, 5, 1, 5]));

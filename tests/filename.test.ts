@@ -67,7 +67,6 @@ assert.ok(cr.includes('audio-${lang.code}'.replace('${lang.code}', '${lang.code}
 assert.ok(cr.includes("type: 'Subtitle'"), 'subtitles are not added to the tree');
 console.log('✓ live view spans decryption; per-language audio + subtitle rows');
 
-
 // ── verbose per-stream chatter must stay at debug level ───────────────────
 const cr2 = fs.readFileSync(path.join(__dirname, '..', 'crunchy.ts'), 'utf8');
 for (const noisy of [

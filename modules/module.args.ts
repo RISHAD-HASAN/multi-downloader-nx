@@ -236,9 +236,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 'theme',
 		group: 'util',
 		describe: 'Colour theme for the CLI output',
-		docDescribe:
-			'Colour palette used by the console renderer.' +
-			'\nAvailable: catppuccin-mocha, dracula, nord, gruvbox, one-dark, mono.',
+		docDescribe: 'Colour palette used by the console renderer.' + '\nAvailable: catppuccin-mocha, dracula, nord, gruvbox, one-dark, mono.',
 		service: ['all'],
 		type: 'string',
 		choices: ['catppuccin-mocha', 'dracula', 'nord', 'gruvbox', 'one-dark', 'mono'],
@@ -545,7 +543,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 			default: true
 		}
 	},
-	{  
+	{
 		name: 'subtitleTimestampFix',
 		group: 'dl',
 		describe:
@@ -559,17 +557,17 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		}
 	},
 	{
-    	name: 'signSubsForced',
-    	describe: 'Set sign subs as forced/default/none',
-    	docDescribe: true,
-    	group: 'mux',
-    	service: ['all'],
-    	type: 'string',
-    	usage: '',
+		name: 'signSubsForced',
+		describe: 'Set sign subs as forced/default/none',
+		docDescribe: true,
+		group: 'mux',
+		service: ['all'],
+		type: 'string',
+		usage: '',
 		choices: ['yes', 'default', 'no'],
-    	default: {
-      		default: 'no'
-    	}
+		default: {
+			default: 'no'
+		}
 	},
 	{
 		name: 'novids',
@@ -1189,4 +1187,3 @@ const buildDefault = () => {
 };
 
 export { getDefault, buildDefault, args, groups, availableFilenameVars };
-

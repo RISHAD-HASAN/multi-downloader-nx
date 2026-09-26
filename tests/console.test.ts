@@ -26,14 +26,7 @@ setTheme('catppuccin-mocha');
 		c.info('plain', 'multi', 'args');
 		c.info('obj:', { a: 1, b: [2, 3] });
 	});
-	for (const expect of [
-		'Your Country: BD',
-		'USER: alice (a@b.c)',
-		'✓ [S1E2] The Journey',
-		'count 3.7 and 4',
-		'plain multi args',
-		'a: 1'
-	]) {
+	for (const expect of ['Your Country: BD', 'USER: alice (a@b.c)', '✓ [S1E2] The Journey', 'count 3.7 and 4', 'plain multi args', 'a: 1']) {
 		assert.ok(t.includes(expect), `missing substitution result: ${expect}`);
 	}
 	assert.ok(!t.includes('%s'), 'unsubstituted %s left in output');
@@ -129,7 +122,7 @@ setTheme('catppuccin-mocha');
 }
 
 {
-	const text = capture(c => c.print(cekTree('Widevine', 'private-pssh', [{ kid: 'private-kid', key: 'private-key', from: 'Local Vault' }])));
+	const text = capture((c) => c.print(cekTree('Widevine', 'private-pssh', [{ kid: 'private-kid', key: 'private-key', from: 'Local Vault' }])));
 	for (const secret of ['private-pssh', 'private-kid', 'private-key']) assert.ok(!text.includes(secret));
 	assert.ok(text.includes('Widevine') && text.includes('*') && text.includes('Local Vault'));
 	console.log('✓ DRM trees mask PSSH, key IDs and content keys');

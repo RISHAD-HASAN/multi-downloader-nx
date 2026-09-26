@@ -101,7 +101,7 @@ export let argvC: {
 	// Proxy
 	proxy: string;
 	proxyAll: boolean;
-  //handling signs subtitles
+	//handling signs subtitles
 	signSubsForced: 'yes' | 'default' | 'no';
 	// URL auto-detection (fork: Yurasubs)
 	url: string | undefined;

@@ -11,20 +11,20 @@
 enabled: true
 
 key_vaults:
-  # Local SQLite db. Same table layout as devine/unshackle vaults, so you can
-  # point this at an existing key_vault.db. Needs Node >= 22.5 for node:sqlite.
-  - type: SQLite
-    name: 'Local Vault'
-    path: './config/key_vault.db'
+    # Local SQLite db. Same table layout as devine/unshackle vaults, so you can
+    # point this at an existing key_vault.db. Needs Node >= 22.5 for node:sqlite.
+    - type: SQLite
+      name: 'Local Vault'
+      path: './config/key_vault.db'
 
-  # No-dependency fallback if you're on an older Node.
-  # - type: JSON
-  #   name: 'Local JSON Vault'
-  #   path: './config/key_vault.json'
+    # No-dependency fallback if you're on an older Node.
+    # - type: JSON
+    #   name: 'Local JSON Vault'
+    #   path: './config/key_vault.json'
 
-  # Remote HTTP vault.
-  # - type: API
-  #   name: 'Team Vault'
-  #   uri: 'https://vault.example.com/api'
-  #   token: 'your-secret-key'
-  #   no_push: false     # true = read only
+    # Remote HTTP vault.
+    # - type: API
+    #   name: 'Team Vault'
+    #   uri: 'https://vault.example.com/api'
+    #   token: 'your-secret-key'
+    #   no_push: false     # true = read only

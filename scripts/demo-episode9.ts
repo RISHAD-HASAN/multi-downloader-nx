@@ -36,9 +36,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 	console_.write('\u0000MARK\u0000\n');
 
 	// ── one live view for the whole episode ────────────────────────────────
-	beginSession([
-		{ key: 'video', type: 'Video', label: '1920x1080 (11449KiB/s) | vod-gcp.crunchyrollcdn.com' }
-	]);
+	beginSession([{ key: 'video', type: 'Video', label: '1920x1080 (11449KiB/s) | vod-gcp.crunchyrollcdn.com' }]);
 	addTrack({ key: 'audio-jpn', type: 'Audio', label: '200kB/s | Japanese | vod-gcp.crunchyrollcdn.com' });
 
 	const VT = 355;
@@ -57,7 +55,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 	trackState('audio-jpn', 'Downloaded');
 
 	// English dub joins the same tree (video is reused, not re-downloaded)
-	
+
 	addTrack({ key: 'audio-eng', type: 'Audio', label: '200kB/s | English | vod-cf-ap-south-1.crunchyrollcdn.com' });
 	for (let i = 1; i <= AT; i++) {
 		trackProgress('audio-eng', { completed: i, total: AT, bytes: Math.round(i * 94_600) });
@@ -89,9 +87,6 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 	console_.info('Subtitles: en, en, en (Total: [repr.number]3[/])');
 	console_.info('Required fonts: Arial, Trebuchet MS, Times New Roman, Georgia (Total: [repr.number]4[/])');
 	console_.print(
-		new Padding(
-			'[green]C:\\Users\\Rishad\\Videos\\Mushoku.Tensei.Jobless.Reincarnation.S03E09.Lament.1080p.CR.WEB.DL.AAC2.0.H.264.S3NKU.mkv[/] [text2]done[/]',
-			[1, 0, 1, 5]
-		)
+		new Padding('[green]C:\\Users\\Rishad\\Videos\\Mushoku.Tensei.Jobless.Reincarnation.S03E09.Lament.1080p.CR.WEB.DL.AAC2.0.H.264.S3NKU.mkv[/] [text2]done[/]', [1, 0, 1, 5])
 	);
 })();

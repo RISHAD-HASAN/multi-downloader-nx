@@ -14,7 +14,7 @@ export default class Helper {
 		return new Promise((resolve, reject) => {
 			const child = childProcess.spawn(binary, args, { stdio: 'ignore', windowsHide: true });
 			child.once('error', () => reject(new Error('Unable to start decryption executable')));
-			child.once('close', (code) => code === 0 ? resolve() : reject(new Error(`Decryption failed with exit code ${code}`)));
+			child.once('close', (code) => (code === 0 ? resolve() : reject(new Error(`Decryption failed with exit code ${code}`))));
 		});
 	}
 

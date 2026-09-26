@@ -66,7 +66,7 @@ export type MergerOptions = {
 
 class Merger {
 	constructor(private options: MergerOptions) {
-		//this.options.signSubsForced ??= 'no'; // Default to 'no' if undefined.	
+		//this.options.signSubsForced ??= 'no'; // Default to 'no' if undefined.
 		this.options.signSubsForced = argv.signSubsForced;
 		if (this.options.skipSubMux) this.options.subtitles = [];
 		if (this.options.videoTitle) this.options.videoTitle = this.options.videoTitle.replace(/"/g, "'");
@@ -314,8 +314,8 @@ class Merger {
 			const sortedSubs = [...this.options.subtitles].sort((a, b) => {
 				const getPriority = (s: any) => {
 					if (s.closedCaption) return 2; // CC last
-					if (s.signs) return 1;         // Signs second
-					return 0;                      // Regular first
+					if (s.signs) return 1; // Signs second
+					return 0; // Regular first
 				};
 				return getPriority(a) - getPriority(b);
 			});
@@ -353,7 +353,7 @@ class Merger {
 					} else {
 						args.push('--default-track 0:0');
 					}
-				}			
+				}
 				args.push(`"${subObj.file}"`);
 			}
 		} else {

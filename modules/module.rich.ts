@@ -7,7 +7,6 @@ import { format as nodeFormat, inspect as nodeInspectRaw } from 'util';
 
 const nodeInspect = (v: unknown) => nodeInspectRaw(v, { depth: 4, colors: false, breakLength: 120 });
 
-
 export type Palette = Record<string, string>;
 
 export const DEFAULT_THEME = 'catppuccin-mocha';
@@ -116,7 +115,6 @@ export function resolvePalette(name?: string): Palette | undefined {
 	return PALETTES[name.toLowerCase()];
 }
 
-
 export type RGB = [number, number, number];
 
 export function parseColor(value: string): RGB | undefined {
@@ -134,17 +132,12 @@ export function parseColor(value: string): RGB | undefined {
 
 export function blendRGB(a: RGB, b: RGB, ratio: number): RGB {
 	const r = Math.max(0, Math.min(1, ratio));
-	return [
-		Math.round(a[0] + (b[0] - a[0]) * r),
-		Math.round(a[1] + (b[1] - a[1]) * r),
-		Math.round(a[2] + (b[2] - a[2]) * r)
-	];
+	return [Math.round(a[0] + (b[0] - a[0]) * r), Math.round(a[1] + (b[1] - a[1]) * r), Math.round(a[2] + (b[2] - a[2]) * r)];
 }
 
 const fg = (c: RGB) => `\x1b[38;2;${c[0]};${c[1]};${c[2]}m`;
 const bgSeq = (c: RGB) => `\x1b[48;2;${c[0]};${c[1]};${c[2]}m`;
 export const RESET = '\x1b[0m';
-
 
 export interface Style {
 	color?: RGB;
@@ -302,7 +295,6 @@ export function setTheme(name?: string, enabled = true) {
 	return theme;
 }
 
-
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
 export function stripAnsi(s: string): string {
@@ -449,7 +441,6 @@ export function stripMarkup(input: string): string {
 	return out;
 }
 
-
 export interface Renderable {
 	// Render to a list of lines, each at most `width` visible columns
 	render(width: number): string[];
@@ -485,11 +476,19 @@ export class Text implements Renderable {
 	}
 
 	measure(maxWidth: number): number {
-		return Math.min(maxWidth, Math.max(0, ...String(this.content).split('\n').map((l) => textWidth(stripMarkup(l)))));
+		return Math.min(
+			maxWidth,
+			Math.max(
+				0,
+				...String(this.content)
+					.split('\n')
+					.map((l) => textWidth(stripMarkup(l)))
+			)
+		);
 	}
 
 	render(width: number): string[] {
-		const baseStyle = this.opts.style ? theme.get(this.opts.style) ?? {} : {};
+		const baseStyle = this.opts.style ? (theme.get(this.opts.style) ?? {}) : {};
 		const rawLines = String(this.content).split('\n');
 		const out: string[] = [];
 		for (const raw of rawLines) {
@@ -861,12 +860,16 @@ export class Table implements Renderable {
 			return lines;
 		};
 
-		const edge = (l: string, m: string, r: string) =>
-			paint(l + widths.map((w) => this.box.h.repeat(w + hp * 2)).join(m) + r);
+		const edge = (l: string, m: string, r: string) => paint(l + widths.map((w) => this.box.h.repeat(w + hp * 2)).join(m) + r);
 
 		if (this.showEdge) out.push(edge(this.box.tl, '┬', this.box.tr));
 		if (this.showHeader) {
-			out.push(...renderRow(this.columns.map((c) => c.header ?? ''), 'table.header'));
+			out.push(
+				...renderRow(
+					this.columns.map((c) => c.header ?? ''),
+					'table.header'
+				)
+			);
 			if (this.showEdge) out.push(edge('├', '┼', '┤'));
 		}
 		this.rows.forEach((row, i) => {
@@ -877,7 +880,6 @@ export class Table implements Renderable {
 		return out;
 	}
 }
-
 
 export interface TaskState {
 	id: number;
@@ -976,23 +978,14 @@ export class Spinner implements Renderable {
 	}
 	render(width: number): string[] {
 		const st = theme.get(this.opts.style ?? 'status.spinner') ?? {};
-		const glyph = this.opts.finished ? this.opts.finishedText ?? '' : Spinner.frame();
+		const glyph = this.opts.finished ? (this.opts.finishedText ?? '') : Spinner.frame();
 		const head = glyph ? (theme.enabled ? styleToAnsi(st) + glyph + RESET : glyph) + ' ' : '';
 		const body = renderLines(this.text, Math.max(1, width - textWidth(stripAnsi(head))));
 		return body.map((l, i) => (i === 0 ? head : ' '.repeat(textWidth(stripAnsi(head)))) + l);
 	}
 }
 
-export type ProgressColumn =
-	| 'spinner'
-	| 'bar'
-	| 'percentage'
-	| 'elapsed'
-	| 'remaining'
-	| 'downloaded'
-	| 'speed'
-	| 'description'
-	| string;
+export type ProgressColumn = 'spinner' | 'bar' | 'percentage' | 'elapsed' | 'remaining' | 'downloaded' | 'speed' | 'description' | string;
 
 // rich.progress.Progress - a set of tasks each rendered as one line
 export class Progress implements Renderable {
@@ -1121,7 +1114,6 @@ export class Progress implements Renderable {
 	}
 }
 
-
 /**
  * rich.live.Live - repaints a renderable in place. Falls back to a single
  * final render when stdout is not a TTY (CI logs, GUI mode, piped output).
@@ -1202,7 +1194,6 @@ export class Live {
 	}
 }
 
-
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 
 /**
@@ -1218,7 +1209,6 @@ export function formatArgs(args: any[]): string {
 	}
 	return mapped.map((a) => (typeof a === 'string' ? a : nodeInspect(a))).join(' ');
 }
-
 
 export interface RichConsoleOptions {
 	width?: number;
@@ -1296,10 +1286,7 @@ export class RichConsole {
 	print(renderable: RenderInput = '', opts: { justify?: 'left' | 'center' | 'right' } = {}) {
 		if (this.quiet) return;
 		const width = this.width;
-		let lines = renderLines(
-			typeof renderable === 'string' ? new Text(renderable, { justify: opts.justify }) : renderable,
-			width
-		);
+		let lines = renderLines(typeof renderable === 'string' ? new Text(renderable, { justify: opts.justify }) : renderable, width);
 		if (opts.justify && typeof renderable !== 'string') {
 			lines = lines.map((l) => {
 				const w = textWidth(stripAnsi(l));

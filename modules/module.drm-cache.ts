@@ -16,7 +16,6 @@ export interface KeyContainerLike {
 const WIDEVINE_SYSTEM_ID = 'edef8ba979d64acea3c827dcd51d21ed';
 const PLAYREADY_SYSTEM_ID = '9a04f07998404286ab92e65be0885f95';
 
-
 function readU32(buf: Buffer, off: number): number {
 	return buf.readUInt32BE(off);
 }
@@ -112,12 +111,7 @@ function parsePlayReadyHeader(data: Buffer): string[] {
 		const raw = Buffer.from(b64, 'base64');
 		if (raw.length !== 16) continue;
 		// PlayReady stores the first three GUID components little-endian
-		const le = Buffer.from([
-			raw[3], raw[2], raw[1], raw[0],
-			raw[5], raw[4],
-			raw[7], raw[6],
-			...raw.subarray(8)
-		]);
+		const le = Buffer.from([raw[3], raw[2], raw[1], raw[0], raw[5], raw[4], raw[7], raw[6], ...raw.subarray(8)]);
 		kids.push(le.toString('hex'));
 	}
 	return kids;
@@ -126,7 +120,6 @@ function parsePlayReadyHeader(data: Buffer): string[] {
 function dedupe(kids: string[]): string[] {
 	return [...new Set(kids.map(normaliseKid))].filter((k) => k && k !== '0'.repeat(32));
 }
-
 
 let vaultsByService = new Map<string, Vaults>();
 let vaultConfigs: VaultConfig[] | undefined;

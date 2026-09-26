@@ -72,7 +72,7 @@ const root = path.join(__dirname, '..');
 {
 	const cr = fs.readFileSync(path.join(root, 'crunchy.ts'), 'utf8');
 	assert.ok(cr.includes('beginSession(uiTracks)'), 'crunchy.ts does not open the live download view');
-	assert.ok(cr.includes("trackKey: 'video'"), "crunchy.ts does not tag the video stream");
+	assert.ok(cr.includes("trackKey: 'video'"), 'crunchy.ts does not tag the video stream');
 	assert.ok(cr.includes('trackKey: audioTrackKey'), 'crunchy.ts does not tag the audio stream per language');
 	assert.ok(cr.includes('endSession();'), 'crunchy.ts never closes the live view');
 	assert.ok(cr.includes('tracksTree('), 'crunchy.ts no longer renders the available-tracks tree');

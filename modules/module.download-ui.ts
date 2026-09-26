@@ -116,14 +116,7 @@ class DownloadSession {
 		if (!rt || this.stopped) return;
 		rt.state = state;
 		const inProgress = state === 'Decrypting' || state === 'Muxing';
-		const styled =
-			state === 'FAILED'
-				? '[red]FAILED[/]'
-				: state === 'SKIPPED'
-					? '[yellow]SKIPPED[/]'
-					: inProgress
-						? `[yellow]${state}[/]`
-						: `[green]${state}[/]`;
+		const styled = state === 'FAILED' ? '[red]FAILED[/]' : state === 'SKIPPED' ? '[yellow]SKIPPED[/]' : inProgress ? `[yellow]${state}[/]` : `[green]${state}[/]`;
 		// Tracks that never reported a total (subtitles, chapters) still need a
 		// full bar rather than an idle pulse once they reach a terminal state.
 		const total = rt.total && rt.total > 0 ? rt.total : 1;

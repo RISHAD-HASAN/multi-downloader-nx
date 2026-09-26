@@ -2,21 +2,7 @@
 // console, in every available theme, and writes an HTML preview.
 // Dev tool only - not part of the shipped CLI.
 import fs from 'fs';
-import {
-	GradientBar,
-	Group,
-	Padding,
-	Panel,
-	Progress,
-	RichConsole,
-	Rule,
-	Table,
-	Text,
-	Tree,
-	PALETTES,
-	setTheme,
-	stripAnsi
-} from '../modules/module.rich';
+import { GradientBar, Group, Padding, Panel, Progress, RichConsole, Rule, Table, Text, Tree, PALETTES, setTheme, stripAnsi } from '../modules/module.rich';
 
 const WIDTH = 104;
 
@@ -31,11 +17,7 @@ function session(themeName: string): string {
 		new Padding(
 			new Group(
 				new Text(
-					' ▄▄▄· ▐ ▄ ▪  ·▄▄▄▄  ▄▄▌  \n' +
-						'▐█ ▀█ •█▌▐███ ██▪ ██ ██•  \n' +
-						'▄█▀▀█ ▐█▐▐▌▐█·▐█· ▐█▌██▪  \n' +
-						'▐█ ▪▐▌██▐█▌▐█▌██. ██ ▐█▌▐▌\n' +
-						' ▀  ▀ ▀▀ █▪▀▀▀▀▀▀▀▀• .▀▀▀ ',
+					' ▄▄▄· ▐ ▄ ▪  ·▄▄▄▄  ▄▄▌  \n' + '▐█ ▀█ •█▌▐███ ██▪ ██ ██•  \n' + '▄█▀▀█ ▐█▐▐▌▐█·▐█· ▐█▌██▪  \n' + '▐█ ▪▐▌██▐█▌▐█▌██. ██ ▐█▌▐▌\n' + ' ▀  ▀ ▀▀ █▪▀▀▀▀▀▀▀▀• .▀▀▀ ',
 					{ style: 'ascii.art', justify: 'center' }
 				),
 				new Text(`v [repr.number]5.8.2[/] - © 2021-2026 - github.com/anidl/multi-downloader-nx`, { justify: 'center' })

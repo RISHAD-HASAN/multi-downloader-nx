@@ -181,7 +181,6 @@ async function requestKeysPRD(pssh: string | undefined, licenseServer: string, a
 	}
 }
 
-
 /**
  * Vault-aware Widevine key retrieval.
  *
@@ -189,12 +188,7 @@ async function requestKeysPRD(pssh: string | undefined, licenseServer: string, a
  * config/vaults.yml); the licence server is only contacted for KIDs that are
  * not already cached, and any freshly obtained key is written back.
  */
-export async function getKeysWVD(
-	pssh: string | undefined,
-	licenseServer: string,
-	authData: Record<string, string>,
-	service = 'generic'
-): Promise<KeyContainer[]> {
+export async function getKeysWVD(pssh: string | undefined, licenseServer: string, authData: Record<string, string>, service = 'generic'): Promise<KeyContainer[]> {
 	if (!pssh || !canDecrypt) return [];
 	return (await resolveKeys({
 		service,
@@ -205,12 +199,7 @@ export async function getKeysWVD(
 }
 
 // Vault-aware PlayReady key retrieval. See {@link getKeysWVD}
-export async function getKeysPRD(
-	pssh: string | undefined,
-	licenseServer: string,
-	authData: Record<string, string>,
-	service = 'generic'
-): Promise<KeyContainer[]> {
+export async function getKeysPRD(pssh: string | undefined, licenseServer: string, authData: Record<string, string>, service = 'generic'): Promise<KeyContainer[]> {
 	if (!pssh || !canDecrypt) return [];
 	return (await resolveKeys({
 		service,
