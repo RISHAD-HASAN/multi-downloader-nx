@@ -224,20 +224,18 @@ class SingleTask {
 
 
 /**
- * unshackle's CEK tree: `Widevine(PSSH…)` with `kid:key` leaves, annotated with
- * the vault each key came from.
+ * DRM status tree. Mask PSSH, KIDs and keys before rendering or file logging;
+ * retain only the DRM type and vault attribution.
  */
-export function cekTree(drm: 'Widevine' | 'PlayReady' | 'ClearKey', pssh: string | undefined, keys: Array<{ kid: string; key: string; from?: string; trackKid?: boolean }>): Tree {
-	const label = pssh
-		? `[cyan]${drm}[/][text2](${pssh.length > 40 ? pssh.slice(0, 37) + '…' : pssh})[/]`
-		: `[cyan]${drm}[/]`;
+export function cekTree(drm: 'Widevine' | 'PlayReady' | 'ClearKey', _pssh: string | undefined, keys: Array<{ kid: string; key: string; from?: string; trackKid?: boolean }>): Tree {
+	const label = `[cyan]${drm}[/][text2](*)[/]`;
 	const tree = new Tree(new Text(label, { overflow: 'fold' }));
 	if (!keys.length) tree.add('[logging.level.error]No content keys were returned[/]');
 	for (const k of keys) {
 		const marks: string[] = [];
 		if (k.from) marks.push(`[text2]from ${k.from}[/]`);
 		if (k.trackKid) marks.push('[green]*[/]');
-		tree.add(new Text(`[text2]${k.kid}:${k.key}[/]${marks.length ? ' ' + marks.join(' ') : ''}`, { overflow: 'fold' }));
+		tree.add(new Text(`[text2]*[/]${marks.length ? ' ' + marks.join(' ') : ''}`, { overflow: 'fold' }));
 	}
 	return tree;
 }

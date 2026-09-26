@@ -61,7 +61,7 @@ console.log('✓ shaka/mkvmerge output is captured, not inherited');
 const cr = fs.readFileSync(path.join(__dirname, '..', 'crunchy.ts'), 'utf8');
 assert.ok(cr.includes("'Decrypting'"), 'crunchy.ts does not report a Decrypting state');
 const endIdx = cr.indexOf('endSession();');
-const decIdx = cr.indexOf("trackState('video', 'Decrypting')");
+const decIdx = cr.indexOf("trackState(trackKey, 'Decrypting')");
 assert.ok(decIdx > 0 && endIdx > decIdx, 'the live view must now close AFTER decryption');
 assert.ok(cr.includes('audio-${lang.code}'.replace('${lang.code}', '${lang.code}')), 'audio rows are not per-language');
 assert.ok(cr.includes("type: 'Subtitle'"), 'subtitles are not added to the tree');

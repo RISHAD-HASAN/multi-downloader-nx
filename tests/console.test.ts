@@ -3,6 +3,7 @@
 // substitution (`%s`, `%d`, …) used by ~29 existing call sites, plus markup,
 // wrapping and colour-disabling behaviour.
 import assert from 'assert';
+import { cekTree } from '../modules/module.console';
 import { RichConsole, Text, Tree, Padding, Table, stripAnsi, stripMarkup, renderMarkup, setTheme, theme, textWidth } from '../modules/module.rich';
 
 function capture(fn: (c: RichConsole) => void, opts: any = {}): string {
@@ -127,4 +128,10 @@ setTheme('catppuccin-mocha');
 	console.log('✓ CJK-aware width measurement and wrapping');
 }
 
+{
+	const text = capture(c => c.print(cekTree('Widevine', 'private-pssh', [{ kid: 'private-kid', key: 'private-key', from: 'Local Vault' }])));
+	for (const secret of ['private-pssh', 'private-kid', 'private-key']) assert.ok(!text.includes(secret));
+	assert.ok(text.includes('Widevine') && text.includes('*') && text.includes('Local Vault'));
+	console.log('✓ DRM trees mask PSSH, key IDs and content keys');
+}
 console.log('\nAll console tests passed.');

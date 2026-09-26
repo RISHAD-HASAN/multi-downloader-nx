@@ -386,7 +386,7 @@ export default class Crunchy implements ServiceClass {
 					fs.writeFileSync(fontLoc, Buffer.from(await getFont.res.arrayBuffer()));
 					console.info(automatic ? `${f} was missing so downloaded` : `Downloaded: ${f}`);
 				} else {
-					console.warn(`Failed to download: ${f}`);
+					console.warn(`Failed to download font: ${f}. Subtitles may use a fallback font; place a licensed copy at ${fontLoc} to embed it.`);
 				}
 			}
 		}
@@ -1602,7 +1602,10 @@ export default class Crunchy implements ServiceClass {
 		let dlFailed = false;
 		let dlVideoOnce = false; // Variable to save if best selected video quality was downloaded
 
+		const videoJobs: Promise<void>[] = [];
+		try {
 		for (const mMeta of medias.data) {
+			const audioOnly = Boolean(options.novids || (dlVideoOnce && options.dlVideoOnce));
 			console.debug(`Requesting: [${mMeta.mediaId}] ${mediaName}`);
 
 			// Make sure we have a media id without a : in it
@@ -1865,7 +1868,7 @@ export default class Crunchy implements ServiceClass {
 				else if (options.cbr !== undefined) console.warn('Invalid --cbr value; use 0 or 1. Ignoring this override.');
 				else if (options.majin) mode = 'majin';
 
-				if (rawUrl) {
+				if (rawUrl && (!audioOnly || options.listFormats || options.F)) {
 					const comparison = await comparePlaybackStreams(
 						rawUrl,
 						mode,
@@ -2139,7 +2142,7 @@ export default class Crunchy implements ServiceClass {
 				console.debug('Audio Playlists URL: %s (%s)', acurStream.url, acurStream.type);
 			}
 
-			let tsFile = undefined;
+			let tsFile: string | undefined = undefined;
 
 			// Delete the stream if it's not needed
 			if (options.novids && options.noaudio) {
@@ -2239,7 +2242,7 @@ export default class Crunchy implements ServiceClass {
 						}
 						chosenVideoQuality--;
 
-						let chosenAudioQuality = options.q === 0 ? audios.length : options.q;
+						let chosenAudioQuality = audioOnly || options.q === 0 ? audios.length : options.q;
 						if (chosenAudioQuality > audios.length) {
 							chosenAudioQuality = audios.length;
 						}
@@ -2283,11 +2286,12 @@ export default class Crunchy implements ServiceClass {
 							console.error(`Unable to find language for code ${acurStream.audio_lang}`);
 							return;
 						}
-						const videoBytes = options.novids ? 0 : (chosenVideoSegments.byteLength ?? sizeFromBitrate(chosenVideoSegments.bandwidth, durationSec) ?? 0);
+						const videoBytes = audioOnly ? 0 : (chosenVideoSegments.byteLength ?? sizeFromBitrate(chosenVideoSegments.bandwidth, durationSec) ?? 0);
 						const audioBytes = options.noaudio ? 0 : (chosenAudioSegments.byteLength ?? sizeFromBitrate(chosenAudioSegments.bandwidth, durationSec) ?? 0);
 						const selectedSize = videoBytes + audioBytes;
 						const streamName = selectedVideoVariant === 'majin' ? 'Majin' : selectedVideoVariant === 'cbr0' ? 'CBR 0' : selectedVideoVariant === 'cbr1' ? 'CBR 1' : 'original';
-						console.info(`Selected ${streamName}: ${chosenVideoSegments.resolutionText} | audio ${chosenAudioSegments.resolutionText}${selectedSize ? ` | estimated download ~${formatBytes(selectedSize)}` : ''}`);
+						if (audioOnly) console.info(`Selected audio: ${lang.name} | ${chosenAudioSegments.resolutionText}`);
+						else console.info(`Selected ${streamName}: ${chosenVideoSegments.resolutionText} | audio ${chosenAudioSegments.resolutionText}${selectedSize ? ` | estimated download ~${formatBytes(selectedSize)}` : ''}`);
 						console.debug(
 							`Selected quality: \n\tVideo: ${chosenVideoSegments.resolutionText}\n\tAudio: ${chosenAudioSegments.resolutionText}\n\tVideo Server: ${vselectedServer}\n\tAudio Server: ${aselectedServer}`
 						);
@@ -2322,8 +2326,8 @@ export default class Crunchy implements ServiceClass {
 						);
 						const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.content, tempFile);
 
-						let encryptionKeysVideo;
-						let encryptionKeysAudio;
+						let encryptionKeysVideo: { kid: string; key: string }[] | undefined;
+						let encryptionKeysAudio: { kid: string; key: string }[] | undefined;
 
 						//Handle Getting Decryption Keys if needed
 						if (chosenVideoSegments.pssh_wvd || chosenVideoSegments.pssh_prd || chosenAudioSegments.pssh_wvd || chosenAudioSegments.pssh_prd) {
@@ -2344,18 +2348,18 @@ export default class Crunchy implements ServiceClass {
 							console.info(`Getting decryption keys with ${cdm}`);
 							// New Crunchyroll DRM endpoint for Widevine
 							if (cdm === 'widevine') {
-								encryptionKeysVideo = await getKeysWVD(chosenVideoSegments.pssh_wvd, api.drm_widevine, {
+								encryptionKeysVideo = await getKeysWVD(audioOnly ? chosenAudioSegments.pssh_wvd : chosenVideoSegments.pssh_wvd, api.drm_widevine, {
 									Authorization: `Bearer ${this.token.access_token}`,
 									...api.crunchyDefHeader,
 									Pragma: 'no-cache',
 									'Cache-Control': 'no-cache',
 									'content-type': 'application/octet-stream',
 									'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
-									'x-cr-video-token': videoStream!.token
+									'x-cr-video-token': audioOnly ? (audioStream ?? videoStream)!.token : videoStream!.token
 								}, 'crunchyroll');
 
 								// Check if the audio pssh is different since Crunchyroll started to have different dec keys for audio tracks
-								if (chosenAudioSegments.pssh_wvd && chosenAudioSegments.pssh_wvd !== chosenVideoSegments.pssh_wvd) {
+								if (!audioOnly && chosenAudioSegments.pssh_wvd && chosenAudioSegments.pssh_wvd !== chosenVideoSegments.pssh_wvd) {
 									encryptionKeysAudio = await getKeysWVD(chosenAudioSegments.pssh_wvd, api.drm_widevine, {
 										Authorization: `Bearer ${this.token.access_token}`,
 										...api.crunchyDefHeader,
@@ -2372,18 +2376,18 @@ export default class Crunchy implements ServiceClass {
 
 							// New Crunchyroll DRM endpoint for Playready
 							if (cdm === 'playready') {
-								encryptionKeysVideo = await getKeysPRD(chosenVideoSegments.pssh_prd, api.drm_playready, {
+								encryptionKeysVideo = await getKeysPRD(audioOnly ? chosenAudioSegments.pssh_prd : chosenVideoSegments.pssh_prd, api.drm_playready, {
 									Authorization: `Bearer ${this.token.access_token}`,
 									...api.crunchyDefHeader,
 									Pragma: 'no-cache',
 									'Cache-Control': 'no-cache',
 									'content-type': 'application/octet-stream',
 									'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
-									'x-cr-video-token': videoStream!.token
+									'x-cr-video-token': audioOnly ? (audioStream ?? videoStream)!.token : videoStream!.token
 								}, 'crunchyroll');
 
 								// Check if the audio pssh is different since Crunchyroll started to have different dec keys for audio tracks
-								if (chosenAudioSegments.pssh_prd && chosenAudioSegments.pssh_prd !== chosenVideoSegments.pssh_prd) {
+								if (!audioOnly && chosenAudioSegments.pssh_prd && chosenAudioSegments.pssh_prd !== chosenVideoSegments.pssh_prd) {
 									encryptionKeysAudio = await getKeysPRD(chosenAudioSegments.pssh_prd, api.drm_playready, {
 										Authorization: `Bearer ${this.token.access_token}`,
 										...api.crunchyDefHeader,
@@ -2426,7 +2430,29 @@ export default class Crunchy implements ServiceClass {
 							);
 						}
 
-						let [audioDownloaded, videoDownloaded] = [false, false];
+						// Finalize each track independently; a sibling failure must not prevent decryption.
+						const finishTrack = async (kind: 'video' | 'audio') => {
+							const segments = kind === 'video' ? chosenVideoSegments : chosenAudioSegments;
+							const keys = kind === 'video' ? encryptionKeysVideo : encryptionKeysAudio;
+							const trackKey = kind === 'video' ? 'video' : audioTrackKey;
+							const destination = `${tsFile}.${kind}.m4s`;
+							if (segments.pssh_wvd || segments.pssh_prd) {
+								trackState(trackKey, 'Decrypting');
+								const input = `${tempTsFile}.${kind}.enc.m4s`;
+								const output = `${tempTsFile}.${kind}.m4s`;
+								const binary = this.cfg.bin.shaka || this.cfg.bin.mp4decrypt;
+								if (!binary) throw new Error('mp4decrypt/shaka not found; encrypted file retained');
+								const args = this.cfg.bin.shaka
+									? [`input=${input},stream=${kind},output=${output}`, '--enable_raw_key_decryption', '--keys', (keys || []).map((k, i) => `label=KEY${i + 1}:key_id=${k.kid}:key=${k.key}`).join(',')]
+									: [...(keys || []).flatMap(k => ['--key', `${k.kid}:${k.key}`]), input, output];
+								await Helper.decrypt(binary, args);
+								fs.copyFileSync(output, destination);
+								fs.unlinkSync(output);
+								if (!options.nocleanup) fs.unlinkSync(input);
+								trackState(trackKey, 'Decrypted');
+							}
+							files.push({ type: kind === 'video' ? 'Video' : 'Audio', path: destination, lang, isPrimary });
+						};
 
 						const transferMediaId = currentVersion ? currentVersion.guid : currentMediaId;
 						const skipVideoTransfer = Boolean(dlVideoOnce && options.dlVideoOnce) || Boolean(options.novids);
@@ -2480,8 +2506,8 @@ export default class Crunchy implements ServiceClass {
 							} else {
 								trackState('video', 'Downloaded');
 							}
-							dlVideoOnce = true;
-							videoDownloaded = true;
+							if (!videoDownload.ok) throw new Error('Video download failed');
+							await finishTrack('video');
 						};
 
 						const transferAudioDash = async () => {
@@ -2500,7 +2526,7 @@ export default class Crunchy implements ServiceClass {
 							};
 							const audioDownload = await new streamdl({
 								trackKey: audioTrackKey,
-								output: chosenVideoSegments.pssh_wvd || chosenVideoSegments.pssh_prd ? `${tempTsFile}.audio.enc.m4s` : `${tsFile}.audio.m4s`,
+								output: chosenAudioSegments.pssh_wvd || chosenAudioSegments.pssh_prd ? `${tempTsFile}.audio.enc.m4s` : `${tsFile}.audio.m4s`,
 								timeout: options.timeout,
 								m3u8json: audioJson,
 								// baseurl: chunkPlaylist.baseUrl,
@@ -2526,7 +2552,8 @@ export default class Crunchy implements ServiceClass {
 							} else {
 								trackState(audioTrackKey, 'Downloaded');
 							}
-							audioDownloaded = true;
+							if (!audioDownload.ok) throw new Error('Audio download failed');
+							await finishTrack('audio');
 						};
 
 						const wantAudioTransfer = Boolean(chosenAudioSegments) && !options.noaudio;
@@ -2534,133 +2561,26 @@ export default class Crunchy implements ServiceClass {
 							console.info('Skipping audio download...');
 						}
 
-						// The video and audio DASH tracks are independent transfers writing
-						// to separate files, so run them concurrently and await them as one
-						// batch instead of streaming them one after the other.
-						const dashTransfers: DashTransferTask[] = [];
+						const runTrack = async (task: DashTransferTask) => {
+							try {
+								await this.pendingDashTransfers.run(task);
+							} catch (error) {
+								dlFailed = true;
+								trackState(task.kind === 'video' ? 'video' : audioTrackKey, 'FAILED');
+								console.error(`${task.kind} download/decryption failed: ${(error as Error).message}`);
+							}
+						};
 						if (!skipVideoTransfer) {
-							dashTransfers.push({ key: `video|${transferMediaId}`, kind: 'video', mediaId: transferMediaId, task: transferVideoDash });
+							// Reserve the video before yielding so subsequent dubs only fetch audio.
+							dlVideoOnce = true;
+							const videoJob = runTrack({ key: `video|${transferMediaId}`, kind: 'video', mediaId: transferMediaId, task: transferVideoDash });
+							videoJobs.push(videoJob);
 						}
 						if (wantAudioTransfer) {
-							dashTransfers.push({
-								key: `${audioTrackKey}|${transferMediaId}`,
-								kind: 'audio',
-								mediaId: transferMediaId,
-								langCode: lang.code,
-								task: transferAudioDash
-							});
+							await runTrack({ key: `${audioTrackKey}|${transferMediaId}`, kind: 'audio', mediaId: transferMediaId, langCode: lang.code, task: transferAudioDash });
 						}
-						await this.pendingDashTransfers.runAll(dashTransfers);
-						this.pendingDashTransfers.clear(transferMediaId);
+						if (!options.dlVideoOnce) await Promise.all(videoJobs);
 
-						//Handle Decryption if needed
-						if (
-							(chosenVideoSegments.pssh_wvd || chosenVideoSegments.pssh_prd || chosenAudioSegments.pssh_wvd || chosenAudioSegments.pssh_prd) &&
-							(videoDownloaded || audioDownloaded) &&
-							!dlFailed
-						) {
-							console.debug('Decryption Needed, attempting to decrypt');
-							if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
-								let commandBaseVideo = `--show-progress ${encryptionKeysVideo?.map((kb) => `--key ${kb.kid}:${kb.key}`).join(' ')} `;
-								let commandBaseAudio = `--show-progress ${encryptionKeysAudio?.map((kb) => `--key ${kb.kid}:${kb.key}`).join(' ')} `;
-								let commandVideo = commandBaseVideo + `"${tempTsFile}.video.enc.m4s" "${tempTsFile}.video.m4s"`;
-								let commandAudio = commandBaseAudio + `"${tempTsFile}.audio.enc.m4s" "${tempTsFile}.audio.m4s"`;
-
-								if (this.cfg.bin.shaka) {
-									commandBaseVideo = ` --enable_raw_key_decryption ${encryptionKeysVideo && encryptionKeysVideo.length > 0 ? `--keys "${encryptionKeysVideo.map((kb, i) => `label=KEY${i + 1}:key_id=${kb.kid}:key=${kb.key}`).join(',')}"` : ''}`;
-									commandBaseAudio = ` --enable_raw_key_decryption ${encryptionKeysAudio && encryptionKeysAudio.length > 0 ? `--keys "${encryptionKeysAudio.map((kb, i) => `label=KEY${i + 1}:key_id=${kb.kid}:key=${kb.key}`).join(',')}"` : ''}`;
-									commandVideo = `input="${tempTsFile}.video.enc.m4s",stream=video,output="${tempTsFile}.video.m4s"` + commandBaseVideo;
-									commandAudio = `input="${tempTsFile}.audio.enc.m4s",stream=audio,output="${tempTsFile}.audio.m4s"` + commandBaseAudio;
-								}
-
-								if (videoDownloaded) {
-									trackState('video', 'Decrypting');
-									console.debug(`Started decrypting video, using ${this.cfg.bin.shaka ? 'shaka' : 'mp4decrypt'}`);
-									const decryptVideo = Helper.exec(
-										this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt',
-										this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`,
-										commandVideo
-									);
-									if (!decryptVideo.isOk) {
-										console.error(decryptVideo.err);
-										console.error(`Decryption failed with exit code ${decryptVideo.err.code}`);
-										if (this.cfg.bin.shaka) {
-											console.error(`Downgrade to Shaka-Packager v2.6.1 (https://github.com/shaka-project/shaka-packager/releases/tag/v2.6.1) and try again`);
-										}
-										fs.renameSync(`${tempTsFile}.video.enc.m4s`, `${tsFile}.video.enc.m4s`);
-										return undefined;
-									} else {
-										trackState('video', 'Decrypted');
-										console.debug('Decryption done for video');
-										if (!options.nocleanup) {
-											fs.unlinkSync(`${tempTsFile}.video.enc.m4s`);
-										}
-										fs.copyFileSync(`${tempTsFile}.video.m4s`, `${tsFile}.video.m4s`);
-										fs.unlinkSync(`${tempTsFile}.video.m4s`);
-										files.push({
-											type: 'Video',
-											path: `${tsFile}.video.m4s`,
-											lang: lang,
-											isPrimary: isPrimary
-										});
-									}
-								}
-
-								if (audioDownloaded) {
-									trackState(audioTrackKey, 'Decrypting');
-									console.debug(`Started decrypting audio, using ${this.cfg.bin.shaka ? 'shaka' : 'mp4decrypt'}`);
-									const decryptAudio = Helper.exec(
-										this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt',
-										this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`,
-										commandAudio
-									);
-									if (!decryptAudio.isOk) {
-										console.error(decryptAudio.err);
-										console.error(`Decryption failed with exit code ${decryptAudio.err.code}`);
-										if (this.cfg.bin.shaka) {
-											console.error(`Downgrade to Shaka-Packager v2.6.1 (https://github.com/shaka-project/shaka-packager/releases/tag/v2.6.1) and try again`);
-										}
-										fs.renameSync(`${tempTsFile}.audio.enc.m4s`, `${tsFile}.audio.enc.m4s`);
-										return undefined;
-									} else {
-										if (!options.nocleanup) {
-											fs.unlinkSync(`${tempTsFile}.audio.enc.m4s`);
-										}
-										fs.copyFileSync(`${tempTsFile}.audio.m4s`, `${tsFile}.audio.m4s`);
-										fs.unlinkSync(`${tempTsFile}.audio.m4s`);
-										files.push({
-											type: 'Audio',
-											path: `${tsFile}.audio.m4s`,
-											lang: lang,
-											isPrimary: isPrimary
-										});
-										trackState(audioTrackKey, 'Decrypted');
-										console.debug('Decryption done for audio');
-									}
-								}
-							} else {
-								console.warn('mp4decrypt/shaka not found, files need decryption. Decryption Keys:', encryptionKeysVideo, encryptionKeysAudio);
-							}
-						} else if (dlFailed) {
-							console.error('Download failed, skipping decryption');
-						} else {
-							if (videoDownloaded) {
-								files.push({
-									type: 'Video',
-									path: `${tsFile}.video.m4s`,
-									lang: lang,
-									isPrimary: isPrimary
-								});
-							}
-							if (audioDownloaded) {
-								files.push({
-									type: 'Audio',
-									path: `${tsFile}.audio.m4s`,
-									lang: lang,
-									isPrimary: isPrimary
-								});
-							}
-						}
 					} else if (!options.novids) {
 						// Init parser
 						const parser = new Parser();
@@ -3216,8 +3136,13 @@ export default class Crunchy implements ServiceClass {
 
 			await this.sleep(options.waittime);
 		}
-		endSession();
-		console.info('[green][MDNX] All stream downloads & decryption completed.[/]');
+		} finally {
+			await Promise.all(videoJobs);
+			endSession();
+			this.pendingDashTransfers.clear();
+		}
+		if (dlFailed) console.warn('[MDNX] Some stream downloads or decryption failed.');
+		else console.info('[green][MDNX] All stream downloads & decryption completed.[/]');
 
 		// The ${audio} variable is seeded from the requested dubs; base the final
 		// filename on the audio tracks that actually completed instead, so a

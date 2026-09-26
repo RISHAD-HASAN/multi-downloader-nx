@@ -9,6 +9,15 @@ import { console } from './log';
 const quietDefault = () => richConsole.level !== 'debug' && process.env.isGUI !== 'true';
 
 export default class Helper {
+	/** Non-blocking DRM subprocess. Never log arguments or child output containing keys. */
+	static decrypt(binary: string, args: string[]): Promise<void> {
+		return new Promise((resolve, reject) => {
+			const child = childProcess.spawn(binary, args, { stdio: 'ignore', windowsHide: true });
+			child.once('error', () => reject(new Error('Unable to start decryption executable')));
+			child.once('close', (code) => code === 0 ? resolve() : reject(new Error(`Decryption failed with exit code ${code}`)));
+		});
+	}
+
 	static async question(q: string) {
 		const rl = readline.createInterface({ input, output });
 		const a = await rl.question(q);

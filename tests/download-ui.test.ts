@@ -79,7 +79,7 @@ const root = path.join(__dirname, '..');
 	// Subprocess output is captured now, so the live view spans decryption and
 	// only closes once every stream is finished.
 	const endIdx = cr.indexOf('endSession();');
-	const decIdx = cr.indexOf("trackState('video', 'Decrypting')");
+	const decIdx = cr.indexOf("trackState(trackKey, 'Decrypting')");
 	assert.ok(decIdx > 0, 'crunchy.ts does not report Decrypting');
 	assert.ok(endIdx > decIdx, 'live view must stay open through decryption');
 	assert.ok(cr.includes("type: 'Subtitle'"), 'subtitles are not added to the tree');
