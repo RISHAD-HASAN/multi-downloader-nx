@@ -11,8 +11,8 @@
 enabled: true
 
 key_vaults:
-    # Local SQLite db. Same table layout as devine/unshackle vaults, so you can
-    # point this at an existing key_vault.db. Needs Node >= 22.5 for node:sqlite.
+    # Local SQLite db. Same table layout as devine's vaults, so this can point at
+    # an existing key_vault.db. Needs Node >= 22.5 for node:sqlite.
     - type: SQLite
       name: 'Local Vault'
       path: './config/key_vault.db'
