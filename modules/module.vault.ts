@@ -1,9 +1,6 @@
-// Content key vaults.
-//
-// Caches KID -> CONTENT KEY per service so re-downloading a title (or grabbing
-// another dub that shares keys) never hits the licence server again. Local
-// vaults are checked before network ones. The SQLite schema matches devine's,
-// so an existing key_vault.db can be pointed at directly.
+// Content key vaults: KID -> content key per service, so re-downloading a title
+// (or another dub that shares keys) never hits the licence server again. Local
+// vaults are checked before network ones.
 
 import fs from 'fs';
 import path from 'path';
@@ -50,7 +47,6 @@ export abstract class Vault {
 	abstract getServices(): Promise<string[]>;
 }
 
-
 type SqliteModule = {
 	DatabaseSync: new (path: string) => {
 		exec(sql: string): void;
@@ -61,7 +57,7 @@ type SqliteModule = {
 
 function loadSqlite(): SqliteModule | undefined {
 	try {
-		// node:sqlite ships with Node >= 22.5 (the engine this project targets)
+		// node:sqlite ships with Node >= 22.5, the version this project targets
 		// eslint-disable-next-line @typescript-eslint/no-require-imports
 		return require('node:sqlite') as SqliteModule;
 	} catch {
@@ -69,11 +65,8 @@ function loadSqlite(): SqliteModule | undefined {
 	}
 }
 
-/**
- * SQLite vault - one table per service, `kid` TEXT PK + `key_` TEXT.
- * Table layout is byte-compatible with unshackle/devine vaults, so an existing
- * `key_vault.db` from unshackle can be pointed at directly.
- */
+// SQLite vault: one table per service, `kid` TEXT PK + `key_` TEXT. The layout
+// matches devine's, so an existing `key_vault.db` can be pointed at directly.
 export class SQLiteVault extends Vault {
 	public local = true;
 	private db?: ReturnType<SqliteModule['DatabaseSync']['prototype']['constructor']> | any;
@@ -104,7 +97,7 @@ export class SQLiteVault extends Vault {
 		return this.db;
 	}
 
-	// Service tables are matched case-insensitively, like unshackle
+	// Service tables are matched case-insensitively
 	private resolveTable(service: string): string | undefined {
 		const db = this.connect();
 		if (!db) return undefined;
@@ -125,9 +118,7 @@ export class SQLiteVault extends Vault {
 	async getKey(kid: string, service: string): Promise<string | undefined> {
 		const table = this.resolveTable(service);
 		if (!table) return undefined;
-		const row = this.connect()
-			.prepare(`SELECT key_ FROM "${table}" WHERE kid = ? AND key_ != ?`)
-			.get(normaliseKid(kid), NULL_KEY);
+		const row = this.connect().prepare(`SELECT key_ FROM "${table}" WHERE kid = ? AND key_ != ?`).get(normaliseKid(kid), NULL_KEY);
 		return row?.key_;
 	}
 
@@ -163,16 +154,12 @@ export class SQLiteVault extends Vault {
 	async getServices(): Promise<string[]> {
 		const db = this.connect();
 		if (!db) return [];
-		return (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as any[]).map(
-			(r) => r.name
-		);
+		return (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as any[]).map((r) => r.name);
 	}
 }
 
-/**
- * JSON-file vault - zero-dependency local fallback for environments without
- * `node:sqlite`. Same semantics, stored as `{ service: { kid: key } }`.
- */
+// JSON-file vault: local fallback for environments without `node:sqlite`.
+// Stored as `{ service: { kid: key } }`.
 export class JSONVault extends Vault {
 	public local = true;
 	private cache?: Record<string, Record<string, string>>;
@@ -243,11 +230,7 @@ export class JSONVault extends Vault {
 	}
 }
 
-
-/**
- * HTTP/API vault - talks to a remote key store (the "API" vault format used by
- * unshackle: POST {method, params, ...} with an `X-Secret-Key` header).
- */
+// HTTP/API vault: POST {method, params, ...} with an `X-Secret-Key` header.
 export class APIVault extends Vault {
 	public local = false;
 
@@ -326,7 +309,6 @@ export class APIVault extends Vault {
 	}
 }
 
-
 export interface VaultHit {
 	kid: string;
 	key: string;
@@ -334,10 +316,7 @@ export interface VaultHit {
 	from?: string;
 }
 
-/**
- * `Vaults` - iterates every configured vault, local ones first.
- * Mirrors unshackle/core/vaults.py.
- */
+// Iterates every configured vault, local ones first.
 export class Vaults {
 	public vaults: Vault[] = [];
 
@@ -402,7 +381,6 @@ export class Vaults {
 	}
 }
 
-
 export interface VaultConfig {
 	type: 'SQLite' | 'JSON' | 'API' | 'HTTP';
 	name?: string;
@@ -412,21 +390,17 @@ export interface VaultConfig {
 	no_push?: boolean;
 }
 
-/**
- * Build the vault chain from `config/vaults.yml`:
- *
- * ```yaml
- * key_vaults:
- *   - type: SQLite
- *     name: "Local Vault"
- *     path: "./config/key_vault.db"
- *   - type: API
- *     name: "Team Vault"
- *     uri: "https://vault.example.com/api"
- *     token: "…"
- *     no_push: false
- * ```
- */
+// Build the vault chain from `config/vaults.yml`:
+//
+//   key_vaults:
+//     - type: SQLite
+//       name: "Local Vault"
+//       path: "./config/key_vault.db"
+//     - type: API
+//       name: "Team Vault"
+//       uri: "https://vault.example.com/api"
+//       token: "..."
+//       no_push: false
 export function buildVaults(service: string, configs: VaultConfig[] | undefined, workingDir: string): Vaults {
 	const vaults = new Vaults(service);
 	if (!configs?.length) return vaults;

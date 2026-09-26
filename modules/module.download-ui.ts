@@ -1,11 +1,9 @@
-// The live download view.
-//
-// Holds one session per episode. hls-download reports into it instead of
-// printing a line per chunk, and extra dubs/subtitles get appended to the same
-// tree as they show up. Normal log lines still print above the live region.
+// The live download view: one session per episode. hls-download reports into it
+// instead of printing a line per chunk, and extra dubs and subtitles are appended
+// to the same tree as they appear. Normal log lines print above the live region.
 
-import { console_ } from './module.console';
-import { DownloadTable, formatBytes, type TrackLike } from './module.console';
+import { DownloadTable, console_, type TrackLike } from './module.console';
+import { formatBytes } from './module.rich';
 
 export type UITrackType = 'Video' | 'Audio' | 'Subtitle';
 
@@ -116,16 +114,9 @@ class DownloadSession {
 		if (!rt || this.stopped) return;
 		rt.state = state;
 		const inProgress = state === 'Decrypting' || state === 'Muxing';
-		const styled =
-			state === 'FAILED'
-				? '[red]FAILED[/]'
-				: state === 'SKIPPED'
-					? '[yellow]SKIPPED[/]'
-					: inProgress
-						? `[yellow]${state}[/]`
-						: `[green]${state}[/]`;
-		// Tracks that never reported a total (subtitles, chapters) still need a
-		// full bar rather than an idle pulse once they reach a terminal state.
+		const styled = state === 'FAILED' ? '[red]FAILED[/]' : state === 'SKIPPED' ? '[yellow]SKIPPED[/]' : inProgress ? `[yellow]${state}[/]` : `[green]${state}[/]`;
+		// Tracks with no known total (subtitles, chapters) show a full bar rather
+		// than an idle pulse once they reach a terminal state.
 		const total = rt.total && rt.total > 0 ? rt.total : 1;
 		this.table.update(key, {
 			completed: inProgress ? Math.max(rt.completed, total) : total,
@@ -144,8 +135,8 @@ class DownloadSession {
 let current: DownloadSession | undefined;
 
 /**
- * Begin the live download view. Returns silently in GUI mode so the GUI's own
- * progress reporting is untouched.
+ * Begin the live download view. No-op in GUI mode, where the GUI reports its own
+ * progress.
  */
 export function beginSession(tracks: UITrack[]): void {
 	endSession();
@@ -158,7 +149,7 @@ export function sessionActive(): boolean {
 	return current !== undefined;
 }
 
-// True when the live view owns this track (so the caller should not log lines).
+// True when the live view owns this track, so the caller stops logging lines.
 export function sessionOwns(key?: string): boolean {
 	return Boolean(current && key && current.has(key));
 }
@@ -190,17 +181,7 @@ export function endSession(): void {
 	current = undefined;
 }
 
-// Guarantees the live region is torn down even if the body throws
-export async function withSession<T>(tracks: UITrack[], fn: () => Promise<T>): Promise<T> {
-	beginSession(tracks);
-	try {
-		return await fn();
-	} finally {
-		endSession();
-	}
-}
-
-// Never leave the terminal with a hidden cursor / half-painted live region.
+// Never leave the terminal with a hidden cursor or a half-painted live region.
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
 	process.on(sig, () => {
 		endSession();

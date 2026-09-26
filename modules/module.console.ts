@@ -1,100 +1,37 @@
-// Console presentation built on module.rich: banner, section rules, listing
-// panels, track trees, content key trees and the live download table.
+// Console presentation built on module.rich: banner, section rules, track trees,
+// content key trees and the live download table.
 
-import {
-	BOX,
-	GradientBar,
-	Group,
-	Live,
-	Padding,
-	Panel,
-	Progress,
-	RichConsole,
-	Rule,
-	Spinner,
-	Table,
-	Text,
-	Tree,
-	formatBytes,
-	formatDuration,
-	renderMarkup,
-	setTheme,
-	stripMarkup,
-	theme,
-	type LogLevel,
-	type RenderInput
-} from './module.rich';
-
-export {
-	BOX,
-	GradientBar,
-	Group,
-	Live,
-	Padding,
-	Panel,
-	Progress,
-	Rule,
-	Spinner,
-	Table,
-	Text,
-	Tree,
-	formatBytes,
-	formatDuration,
-	renderMarkup,
-	setTheme,
-	stripMarkup,
-	theme
-};
+import { Group, Live, Padding, Progress, RichConsole, Rule, Table, Text, Tree, stripMarkup, type LogLevel, type RenderInput } from './module.rich';
 
 export const console_ = new RichConsole({ showTime: false, logPadding: [0, 5] });
 
+const ANIDL_ASCII = [' ▄▄▄· ▐ ▄ ▪  ·▄▄▄▄  ▄▄▌  ', '▐█ ▀█ •█▌▐███ ██▪ ██ ██•  ', '▄█▀▀█ ▐█▐▐▌▐█·▐█· ▐█▌██▪  ', '▐█ ▪▐▌██▐█▌▐█▌██. ██ ▐█▌▐▌', ' ▀  ▀ ▀▀ █▪▀▀▀▀▀▀▀▀• .▀▀▀ '].join(
+	'\n'
+);
 
-const ANIDL_ASCII = [
-	' ▄▄▄· ▐ ▄ ▪  ·▄▄▄▄  ▄▄▌  ',
-	'▐█ ▀█ •█▌▐███ ██▪ ██ ██•  ',
-	'▄█▀▀█ ▐█▐▐▌▐█·▐█· ▐█▌██▪  ',
-	'▐█ ▪▐▌██▐█▌▐█▌██. ██ ▐█▌▐▌',
-	' ▀  ▀ ▀▀ █▪▀▀▀▀▀▀▀▀• .▀▀▀ '
-].join('\n');
-
-/**
- * The centred ASCII banner + version line, mirroring unshackle's `__main__`.
- */
+// The centred ASCII banner and version line.
 export function printBanner(version: string, extra?: string) {
 	const year = new Date().getFullYear();
 	console_.print(
 		new Padding(
 			new Group(
 				new Text(ANIDL_ASCII, { style: 'ascii.art', justify: 'center' }),
-				new Text(
-					`v [repr.number]${version}[/]${extra ? ` (${extra})` : ''} - © 2021-${year} - github.com/anidl/multi-downloader-nx`,
-					{ justify: 'center' }
-				)
+				new Text(`v [repr.number]${version}[/]${extra ? ` (${extra})` : ''} - © 2021-${year} - github.com/anidl/multi-downloader-nx`, { justify: 'center' })
 			),
 			[1, 11, 1, 10]
 		)
 	);
 }
 
-
-// `console.print(Padding(Rule("[rule.text]…"), (1, 2)))`
+// A section header: a rule with a title, padded like the rest of the output
 export function rule(title: string, pad: [number, number] | number = [1, 2]) {
 	console_.print(new Padding(new Rule(`[rule.text]${title}[/]`), pad));
 }
 
-// A padded body block at unshackle's standard (0, 5) indent
+// A padded body block at the standard (0, 5) indent
 export function block(renderable: RenderInput, pad: [number, number] | [number, number, number, number] = [0, 5]) {
 	console_.print(new Padding(renderable, pad));
 }
-
-// unshackle's `listing_panel` - a titled panel listing renderables
-export function listingPanel(items: RenderInput[], title: string): Panel {
-	const grid = Table.grid({ padding: [0, 1] });
-	if (items.length === 0) grid.addRow('[text2]Nothing to list[/]');
-	for (const item of items) grid.addRow(item);
-	return new Panel(grid, { title: `[panel.title]${title}[/]`, box: BOX.ROUNDED, padding: [0, 1] });
-}
-
 
 export interface TrackLike {
 	type: 'Video' | 'Audio' | 'Subtitle' | 'Chapter' | 'Attachment';
@@ -104,10 +41,7 @@ export interface TrackLike {
 
 const TRACK_ORDER: TrackLike['type'][] = ['Video', 'Audio', 'Subtitle', 'Chapter', 'Attachment'];
 
-/**
- * Build unshackle's `Tracks.tree()`: one branch per track type, labelled
- * "[n] Videos", with each track described beneath it.
- */
+// One branch per track type, labelled "[n] Videos", each track beneath it.
 export function tracksTree(tracks: TrackLike[]): Tree {
 	const tree = new Tree('', { hideRoot: true });
 	for (const type of TRACK_ORDER) {
@@ -120,10 +54,8 @@ export function tracksTree(tracks: TrackLike[]): Tree {
 	return tree;
 }
 
-/**
- * The live download view: a tree of tracks where each leaf carries its own
- * spinner + gradient bar + ETA + state, refreshed in place.
- */
+// The live download view: a tree of tracks where each leaf carries its own
+// spinner, bar, ETA and state, refreshed in place.
 export class DownloadTable {
 	public progress = new Progress(['spinner', 'bar', '•', 'remaining', '•', 'downloaded'], { barWidth: 32 });
 	private taskByKey = new Map<string, number>();
@@ -222,7 +154,6 @@ class SingleTask {
 	}
 }
 
-
 /**
  * DRM status tree. Mask PSSH, KIDs and keys before rendering or file logging;
  * retain only the DRM type and vault attribution.
@@ -238,20 +169,6 @@ export function cekTree(drm: 'Widevine' | 'PlayReady' | 'ClearKey', _pssh: strin
 		tree.add(new Text(`[text2]*[/]${marks.length ? ' ' + marks.join(' ') : ''}`, { overflow: 'fold' }));
 	}
 	return tree;
-}
-
-
-export function selectionCancelled() {
-	console_.print(new Padding(':x: Selection Cancelled...', [0, 5, 1, 5]));
-}
-
-export function downloadCancelled() {
-	console_.print(new Padding(':x: Download Cancelled...', [0, 5, 1, 5]));
-}
-
-// "Processed all titles in 1:23" footer
-export function elapsedFooter(label: string, seconds: number) {
-	console_.print(new Padding(`${label} [progress.elapsed]${formatDuration(seconds)}[/]`, [0, 5, 1, 5]));
 }
 
 export type { LogLevel, RenderInput };

@@ -42,14 +42,14 @@ export default tseslint.config(
 			indent: 'off'
 		}
 	},
-	// Tests and preview scripts print diagnostics by design.
+	// Tests print diagnostics by design.
 	{
-		files: ['tests/**/*', 'scripts/**/*'],
+		files: ['tests/**/*'],
 		rules: { 'no-console': 'off' }
 	},
-	// These expressions deliberately match ANSI escape codes.
+	// The renderer matches ANSI escape codes on purpose.
 	{
-		files: ['modules/module.rich.ts', 'scripts/render-cli-preview.ts'],
+		files: ['modules/module.rich.ts'],
 		rules: { 'no-control-regex': 'off' }
 	},
 	// Disables all rules that conflict with prettier

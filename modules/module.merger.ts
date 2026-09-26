@@ -66,7 +66,7 @@ export type MergerOptions = {
 
 class Merger {
 	constructor(private options: MergerOptions) {
-		//this.options.signSubsForced ??= 'no'; // Default to 'no' if undefined.	
+		//this.options.signSubsForced ??= 'no'; // Default to 'no' if undefined.
 		this.options.signSubsForced = argv.signSubsForced;
 		if (this.options.skipSubMux) this.options.subtitles = [];
 		if (this.options.videoTitle) this.options.videoTitle = this.options.videoTitle.replace(/"/g, "'");
@@ -225,10 +225,9 @@ class Merger {
 		return args.join(' ');
 	}
 
-	// Index of the audio stream that should carry the "default" disposition when
-	// muxing with FFmpeg: the first track matching the configured default audio
-	// language, in mapping order (videoAndAudio tracks first, then onlyAudio
-	// tracks). Returns -1 when no track matches.
+	// Index of the audio stream that should carry the "default" disposition under
+	// FFmpeg: the first track matching the configured default language, in mapping
+	// order (videoAndAudio first, then onlyAudio). -1 when nothing matches.
 	public defaultAudioIndex(): number {
 		const wanted = this.options.defaults?.audio?.code;
 		if (!wanted) return -1;
@@ -314,8 +313,8 @@ class Merger {
 			const sortedSubs = [...this.options.subtitles].sort((a, b) => {
 				const getPriority = (s: any) => {
 					if (s.closedCaption) return 2; // CC last
-					if (s.signs) return 1;         // Signs second
-					return 0;                      // Regular first
+					if (s.signs) return 1; // Signs second
+					return 0; // Regular first
 				};
 				return getPriority(a) - getPriority(b);
 			});
@@ -353,7 +352,7 @@ class Merger {
 					} else {
 						args.push('--default-track 0:0');
 					}
-				}			
+				}
 				args.push(`"${subObj.file}"`);
 			}
 		} else {
@@ -478,7 +477,7 @@ class Merger {
 		} else {
 			console.debug(`[${type} Done]`);
 		}
-		// Final, single line the user actually cares about
+		// The one line that matters
 		console.print(new Padding(`[green]${this.options.output}[/] [text2]done[/]`, [1, 0, 1, 5]));
 	}
 

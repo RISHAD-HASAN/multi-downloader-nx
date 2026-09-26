@@ -1,6 +1,5 @@
-// Logger. Drop-in for the log4js one that used to live here: same
-// console.info/warn/error/debug surface, but rendered through RichConsole.
-// logs/latest.log still gets plain text.
+// Drop-in replacement for the log4js logger: the same console.info/warn/error/debug
+// surface, rendered through RichConsole. logs/latest.log still gets plain text.
 
 import fs from 'fs';
 import path from 'path';
@@ -100,10 +99,8 @@ process.on('warning', (w) => {
 	rich.warn(`${w.name}: ${w.message}`);
 });
 
-/**
- * Backwards-compatible logger object. `console.info(...)` etc. behave exactly
- * as before from a caller's point of view, but now render with markup support.
- */
+// Backwards-compatible logger: console.info(...) and friends behave as before,
+// now with markup support.
 export const console = Object.assign(rich, {
 	// log4js parity aliases used in a few places
 	trace: (...a: any[]) => rich.debug(...a),

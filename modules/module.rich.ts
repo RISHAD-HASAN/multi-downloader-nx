@@ -1,12 +1,9 @@
-// Small reimplementation of the parts of Python's rich that the console layer
-// needs: themes, markup, panels/trees/tables, progress bars and a Live region.
-// Deliberately dependency free. The Node ports either don't do the Live/refresh
-// bit properly or pull in far too much.
+// The subset of Python's rich the console layer needs: themes, markup,
+// panels/trees/tables, progress bars and a Live region. No dependencies.
 
 import { format as nodeFormat, inspect as nodeInspectRaw } from 'util';
 
 const nodeInspect = (v: unknown) => nodeInspectRaw(v, { depth: 4, colors: false, breakLength: 120 });
-
 
 export type Palette = Record<string, string>;
 
@@ -116,7 +113,6 @@ export function resolvePalette(name?: string): Palette | undefined {
 	return PALETTES[name.toLowerCase()];
 }
 
-
 export type RGB = [number, number, number];
 
 export function parseColor(value: string): RGB | undefined {
@@ -134,17 +130,12 @@ export function parseColor(value: string): RGB | undefined {
 
 export function blendRGB(a: RGB, b: RGB, ratio: number): RGB {
 	const r = Math.max(0, Math.min(1, ratio));
-	return [
-		Math.round(a[0] + (b[0] - a[0]) * r),
-		Math.round(a[1] + (b[1] - a[1]) * r),
-		Math.round(a[2] + (b[2] - a[2]) * r)
-	];
+	return [Math.round(a[0] + (b[0] - a[0]) * r), Math.round(a[1] + (b[1] - a[1]) * r), Math.round(a[2] + (b[2] - a[2]) * r)];
 }
 
 const fg = (c: RGB) => `\x1b[38;2;${c[0]};${c[1]};${c[2]}m`;
 const bgSeq = (c: RGB) => `\x1b[48;2;${c[0]};${c[1]};${c[2]}m`;
 export const RESET = '\x1b[0m';
-
 
 export interface Style {
 	color?: RGB;
@@ -221,7 +212,7 @@ export class Theme {
 			u: { underline: true },
 			strike: { strike: true },
 
-			// rich semantic styles used by unshackle
+			// rich semantic styles
 			'ascii.art': { ...col('pink'), bold: true },
 			'rule.line': col('dark_gray'),
 			'rule.text': { ...col('pink'), bold: true },
@@ -302,7 +293,6 @@ export function setTheme(name?: string, enabled = true) {
 	return theme;
 }
 
-
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
 export function stripAnsi(s: string): string {
@@ -369,11 +359,8 @@ export function truncateVisible(s: string, width: number, ellipsis = '…'): str
 	return out + ellipsis + RESET;
 }
 
-/**
- * Render rich-style console markup: `[cyan]hi[/]`, `[bold red]x[/bold red]`,
- * `[repr.number]5[/]`. Unknown tags are left as literal text (rich behaviour).
- * Escape a literal bracket with `\[`.
- */
+// Render rich-style console markup: `[cyan]hi[/]`, `[bold red]x[/bold red]`,
+// `[repr.number]5[/]`. Unknown tags stay literal; `\[` escapes a bracket.
 export function renderMarkup(input: string, base: Style = {}): string {
 	if (!theme.enabled) return stripMarkup(input);
 	const stack: Style[] = [base];
@@ -449,7 +436,6 @@ export function stripMarkup(input: string): string {
 	return out;
 }
 
-
 export interface Renderable {
 	// Render to a list of lines, each at most `width` visible columns
 	render(width: number): string[];
@@ -485,11 +471,19 @@ export class Text implements Renderable {
 	}
 
 	measure(maxWidth: number): number {
-		return Math.min(maxWidth, Math.max(0, ...String(this.content).split('\n').map((l) => textWidth(stripMarkup(l)))));
+		return Math.min(
+			maxWidth,
+			Math.max(
+				0,
+				...String(this.content)
+					.split('\n')
+					.map((l) => textWidth(stripMarkup(l)))
+			)
+		);
 	}
 
 	render(width: number): string[] {
-		const baseStyle = this.opts.style ? theme.get(this.opts.style) ?? {} : {};
+		const baseStyle = this.opts.style ? (theme.get(this.opts.style) ?? {}) : {};
 		const rawLines = String(this.content).split('\n');
 		const out: string[] = [];
 		for (const raw of rawLines) {
@@ -587,7 +581,7 @@ function unpackPadding(p: PaddingDims): [number, number, number, number] {
 	return p;
 }
 
-// rich.padding.Padding - the (0, 5) indent that gives unshackle its look.
+// rich.padding.Padding - the (0, 5) indent the console is built around
 export class Padding implements Renderable {
 	constructor(
 		public inner: RenderInput,
@@ -690,7 +684,7 @@ export class Panel implements Renderable {
 	}
 }
 
-// rich.tree.Tree
+// rich.tree.Tree - a labelled branch with children
 export class Tree implements Renderable {
 	public children: Tree[] = [];
 	constructor(
@@ -737,10 +731,8 @@ export interface ColumnSpec {
 	noWrap?: boolean;
 }
 
-/**
- * rich.table.Table - supports `Table.grid()` (invisible layout table, what
- * unshackle uses everywhere) and bordered tables with headers.
- */
+// rich.table.Table - `Table.grid()` for invisible layout tables, plus bordered
+// tables with headers.
 export class Table implements Renderable {
 	public rows: RenderInput[][] = [];
 	public columns: ColumnSpec[] = [];
@@ -861,12 +853,16 @@ export class Table implements Renderable {
 			return lines;
 		};
 
-		const edge = (l: string, m: string, r: string) =>
-			paint(l + widths.map((w) => this.box.h.repeat(w + hp * 2)).join(m) + r);
+		const edge = (l: string, m: string, r: string) => paint(l + widths.map((w) => this.box.h.repeat(w + hp * 2)).join(m) + r);
 
 		if (this.showEdge) out.push(edge(this.box.tl, '┬', this.box.tr));
 		if (this.showHeader) {
-			out.push(...renderRow(this.columns.map((c) => c.header ?? ''), 'table.header'));
+			out.push(
+				...renderRow(
+					this.columns.map((c) => c.header ?? ''),
+					'table.header'
+				)
+			);
 			if (this.showEdge) out.push(edge('├', '┼', '┤'));
 		}
 		this.rows.forEach((row, i) => {
@@ -877,7 +873,6 @@ export class Table implements Renderable {
 		return out;
 	}
 }
-
 
 export interface TaskState {
 	id: number;
@@ -913,10 +908,8 @@ export function formatDuration(secs: number, compact = true): string {
 	return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/**
- * unshackle's GradientPulseBarColumn: a bar that blends pink->blue across the
- * completed portion and animates a pulse while the task total is unknown.
- */
+// A bar that blends pink->blue across the completed portion and pulses while
+// the task total is unknown.
 export class GradientBar implements Renderable {
 	constructor(
 		public task: TaskState,
@@ -976,23 +969,14 @@ export class Spinner implements Renderable {
 	}
 	render(width: number): string[] {
 		const st = theme.get(this.opts.style ?? 'status.spinner') ?? {};
-		const glyph = this.opts.finished ? this.opts.finishedText ?? '' : Spinner.frame();
+		const glyph = this.opts.finished ? (this.opts.finishedText ?? '') : Spinner.frame();
 		const head = glyph ? (theme.enabled ? styleToAnsi(st) + glyph + RESET : glyph) + ' ' : '';
 		const body = renderLines(this.text, Math.max(1, width - textWidth(stripAnsi(head))));
 		return body.map((l, i) => (i === 0 ? head : ' '.repeat(textWidth(stripAnsi(head)))) + l);
 	}
 }
 
-export type ProgressColumn =
-	| 'spinner'
-	| 'bar'
-	| 'percentage'
-	| 'elapsed'
-	| 'remaining'
-	| 'downloaded'
-	| 'speed'
-	| 'description'
-	| string;
+export type ProgressColumn = 'spinner' | 'bar' | 'percentage' | 'elapsed' | 'remaining' | 'downloaded' | 'speed' | 'description' | string;
 
 // rich.progress.Progress - a set of tasks each rendered as one line
 export class Progress implements Renderable {
@@ -1121,11 +1105,8 @@ export class Progress implements Renderable {
 	}
 }
 
-
-/**
- * rich.live.Live - repaints a renderable in place. Falls back to a single
- * final render when stdout is not a TTY (CI logs, GUI mode, piped output).
- */
+// rich.live.Live - repaints a renderable in place, and falls back to a single
+// final render when stdout is not a TTY.
 export class Live {
 	private timer?: NodeJS.Timeout;
 	private lastHeight = 0;
@@ -1202,14 +1183,11 @@ export class Live {
 	}
 }
 
-
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 
-/**
- * Reproduce log4js/`util.format` argument handling so existing call sites such
- * as `console.info('Your Country: %s', country)` keep substituting correctly.
- * Errors render as their stack, matching the previous logger.
- */
+// log4js/`util.format` argument handling, so call sites like
+// `console.info('Your Country: %s', country)` keep substituting. Errors render
+// as their stack, as the old logger did.
 export function formatArgs(args: any[]): string {
 	if (args.length === 0) return '';
 	const mapped = args.map((a) => (a instanceof Error ? a.stack || a.message : a));
@@ -1218,7 +1196,6 @@ export function formatArgs(args: any[]): string {
 	}
 	return mapped.map((a) => (typeof a === 'string' ? a : nodeInspect(a))).join(' ');
 }
-
 
 export interface RichConsoleOptions {
 	width?: number;
@@ -1231,10 +1208,7 @@ export interface RichConsoleOptions {
 	logPadding?: PaddingDims;
 }
 
-/**
- * ComfyConsole equivalent: the padded, level-column log renderer that gives
- * unshackle its signature output, plus print/rule/panel helpers.
- */
+// The logger: padded, level-column output plus print/rule/panel helpers.
 export class RichConsole {
 	public stream: NodeJS.WriteStream;
 	public showTime: boolean;
@@ -1296,10 +1270,7 @@ export class RichConsole {
 	print(renderable: RenderInput = '', opts: { justify?: 'left' | 'center' | 'right' } = {}) {
 		if (this.quiet) return;
 		const width = this.width;
-		let lines = renderLines(
-			typeof renderable === 'string' ? new Text(renderable, { justify: opts.justify }) : renderable,
-			width
-		);
+		let lines = renderLines(typeof renderable === 'string' ? new Text(renderable, { justify: opts.justify }) : renderable, width);
 		if (opts.justify && typeof renderable !== 'string') {
 			lines = lines.map((l) => {
 				const w = textWidth(stripAnsi(l));
@@ -1344,7 +1315,7 @@ export class RichConsole {
 			gutter += (t === this.lastTime ? ' '.repeat(textWidth(t)) : renderMarkup(`[log.time]${t}[/]`)) + ' ';
 			this.lastTime = t;
 		}
-		// INFO is the "quiet" default level: no label, matching unshackle's look
+		// INFO is the quiet default level: no label
 		const showLabel = level !== 'info';
 		const levelCol = showLabel ? this.levelText(level) + ' ' : '';
 		const indent = left;
@@ -1362,12 +1333,12 @@ export class RichConsole {
 	// Alias kept for drop-in compatibility with the old log4js logger
 	log = (...a: any[]) => this.writeLog('info', ...a);
 
-	// `console.print(Padding(Rule(...), (1, 2)))` - unshackle's section header.
+	// Section header: a padded rule with an optional centred title
 	rule(title = '', pad: PaddingDims = [1, 2]) {
 		this.print(new Padding(new Rule(title), pad));
 	}
 
-	// A transient spinner status line, padded like unshackle's
+	// A transient spinner status line
 	status(text: RenderInput, pad: PaddingDims = [0, 5]): Live {
 		return new Live(new Padding(new Spinner(text), pad), { console: this, transient: true, refreshPerSecond: 12.5 }).start();
 	}

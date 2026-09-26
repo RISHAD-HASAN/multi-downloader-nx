@@ -101,14 +101,14 @@ export let argvC: {
 	// Proxy
 	proxy: string;
 	proxyAll: boolean;
-  //handling signs subtitles
+	//handling signs subtitles
 	signSubsForced: 'yes' | 'default' | 'no';
-	// URL auto-detection (fork: Yurasubs)
+	// URL auto-detection
 	url: string | undefined;
-	// List every available video/audio format and exit (fork: Yurasubs)
+	// List every available video/audio format and exit
 	'list-formats': boolean;
 	listFormats: boolean;
-	// Crunchyroll DASH stream selection (fork: Yurasubs)
+	// Crunchyroll DASH stream selection
 	majin: boolean;
 	cbr: '0' | '1' | undefined;
 	// console output

@@ -1,8 +1,8 @@
 import { parse as parseMpd } from 'mpd-parser';
 
-// Crunchyroll serves separate DASH encodes for the Majin (VBR) and CBR 0/1
-// paths. Keep the selection local to one playback/version: other dubs may not
-// have the same encodes. None of these rewrites apply to HLS manifests.
+// Crunchyroll serves separate DASH encodes for Majin (VBR) and the CBR 0/1
+// paths, and the selection is local to one playback version: other dubs may not
+// carry the same encodes. None of this applies to HLS manifests.
 export type StreamVariant = 'majin' | 'cbr0' | 'cbr1';
 export type StreamMode = 'auto' | StreamVariant;
 
@@ -85,9 +85,9 @@ function parseCandidate(variant: StreamVariant, url: string, manifest: string, f
 	if (!/<MPD(?:\s|>)/i.test(manifest)) return;
 	const playlists = parseMpd(manifest, { manifestUri: url }).playlists ?? [];
 	const videos = playlists.filter((playlist) => playlist.attributes.RESOLUTION && playlist.attributes.BANDWIDTH > 0);
-	// Prefer 1080p+ if present; within that tier compare the highest declared
-	// bitrate, as in Yurasubs' stream comparison. Do not HEAD an MPD or a single
-	// SegmentTemplate part: only a SegmentBase sidx points at the *whole* file.
+	// Prefer 1080p+ when present, then the highest declared bitrate. Only a
+	// SegmentBase sidx can be HEADed - an MPD or a single SegmentTemplate part is
+	// not the whole file.
 	const hd = videos.filter((playlist) => playlist.attributes.RESOLUTION!.height >= 1080 || playlist.attributes.RESOLUTION!.width >= 1920);
 	const best = (hd.length ? hd : videos).sort((a, b) => b.attributes.BANDWIDTH - a.attributes.BANDWIDTH)[0];
 	if (!best) return;
@@ -121,10 +121,10 @@ export function chooseStream(candidates: StreamCandidate[]): StreamCandidate | u
 	const cbrHd = cbr.height >= 1080 || cbr.width >= 1920;
 	if (majinHd !== cbrHd) return majinHd ? majin : cbr;
 
-	// Bitmovin VBR's declared bitrate is its *peak* tier; the measured file
-	// average may be lower. Prefer Majin when it really beats CBR, or when its
-	// tier is higher and its measured bitrate is healthy (7.5 Mbps). If HEAD
-	// cannot provide the whole file size, compare declared tiers instead.
+	// Bitmovin VBR declares its peak tier, while the average file bitrate is
+	// lower. Majin wins when it really beats CBR, or when its tier is higher and
+	// the measured bitrate is healthy (7.5 Mbps). Without a whole-file size from
+	// HEAD, fall back to comparing the declared tiers.
 	const majinWins =
 		(majin.actualBps !== undefined && majin.actualBps > cbr.declaredBps) ||
 		(majin.declaredBps > cbr.declaredBps && (majin.actualBps === undefined || majin.actualBps >= 7_500_000));

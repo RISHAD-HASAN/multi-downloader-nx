@@ -1,3 +1,6 @@
+// Maps a pasted Crunchyroll / HiDive / ADN URL onto a service, a target type and
+// the ID the CLI flags expect.
+
 export type ParsedUrl = {
 	service: 'crunchy' | 'hidive' | 'adn';
 	type: 'series' | 'season' | 'episode' | 'movieListing' | 'extid';
@@ -5,13 +8,6 @@ export type ParsedUrl = {
 	originalUrl: string;
 };
 
-/**
- * Parses a media URL from Crunchyroll, HiDive, or Animation Digital Network (ADN)
- * and extracts the service, content type, and target ID.
- *
- * @param rawUrl The raw URL string provided by the user
- * @returns ParsedUrl object or undefined if not recognized
- */
 export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 	if (!rawUrl || typeof rawUrl !== 'string') return undefined;
 
@@ -30,12 +26,10 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 	const hostname = parsedUrl.hostname.toLowerCase();
 	const pathname = parsedUrl.pathname;
 
-	// 1. Crunchyroll
 	if (hostname === 'crunchyroll.com' || hostname.endsWith('.crunchyroll.com')) {
-		// Strip optional locale prefix: e.g. /en, /fr, /es-419, /pt-br
+		// drop the locale prefix: /en, /fr, /es-419, /pt-br
 		const path = pathname.replace(/^\/[a-z]{2}(?:-[a-z0-9]{2,4})?(?=\/|$)/i, '');
 
-		// Series: /series/ID or /watch/series/ID
 		const seriesMatch = path.match(/^\/(?:watch\/)?series\/([0-9A-Z]{9,})/i);
 		if (seriesMatch) {
 			return {
@@ -46,7 +40,6 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 			};
 		}
 
-		// Movie Listing: /movie_listing/ID or /watch/movie_listing/ID or /movie/ID
 		const movieMatch = path.match(/^\/(?:watch\/)?(?:movie_listing|movie)\/([0-9A-Z]{9,})/i);
 		if (movieMatch) {
 			return {
@@ -57,7 +50,6 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 			};
 		}
 
-		// Season: /season/ID
 		const seasonMatch = path.match(/^\/season\/([0-9A-Z]{9,})/i);
 		if (seasonMatch) {
 			return {
@@ -68,7 +60,6 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 			};
 		}
 
-		// Episode: /watch/ID or /episode/ID
 		const epMatch = path.match(/^\/(?:watch|episode)\/([0-9A-Z]{9,})/i);
 		if (epMatch) {
 			return {
@@ -79,7 +70,7 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 			};
 		}
 
-		// Legacy episode URLs: /<show-name>/<episode-slug>-<extid> (numeric ID)
+		// old episode URLs end in a numeric id: /<show>/<slug>-<extid>
 		const legacyMatch = path.match(/-(\d{5,})(?:\/|$)/);
 		if (legacyMatch) {
 			return {
@@ -93,9 +84,7 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 		return undefined;
 	}
 
-	// 2. HiDive
 	if (hostname === 'hidive.com' || hostname.endsWith('.hidive.com')) {
-		// Season: /season/ID or /movies/ID or /movie/ID
 		const seasonMatch = pathname.match(/^\/(?:season|movies?)\/(\d+)/i);
 		if (seasonMatch) {
 			return {
@@ -106,7 +95,6 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 			};
 		}
 
-		// Series: /series/ID or /tv/ID
 		const seriesMatch = pathname.match(/^\/(?:series|tv)\/(\d+)/i);
 		if (seriesMatch) {
 			return {
@@ -117,7 +105,6 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 			};
 		}
 
-		// Episode: /episode/ID or /stream/.../ID or /watch/.../ID or /stream/ID or /watch/ID
 		const epMatch = pathname.match(/^\/(?:episode|(?:stream|watch)\/[^/]+|(?:stream|watch))\/(\d+)/i);
 		if (epMatch) {
 			return {
@@ -131,7 +118,6 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 		return undefined;
 	}
 
-	// 3. Animation Digital Network (ADN)
 	if (
 		hostname === 'animationdigitalnetwork.fr' ||
 		hostname.endsWith('.animationdigitalnetwork.fr') ||
@@ -140,7 +126,6 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 		hostname === 'adn.fr' ||
 		hostname.endsWith('.adn.fr')
 	) {
-		// Show / Season: /video/show/ID or /show/ID
 		const showMatch = pathname.match(/^\/(?:video\/)?show\/(\d+)/i);
 		if (showMatch) {
 			return {
@@ -151,7 +136,6 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 			};
 		}
 
-		// Single video / Episode: /video/ID (numeric)
 		const videoMatch = pathname.match(/^\/video\/(\d+)(?:-[a-zA-Z0-9-]+)?/i);
 		if (videoMatch) {
 			return {
