@@ -1,7 +1,6 @@
-// Vault lookup in front of the CDM.
-//
-// Pulls the KIDs out of the PSSH, asks the vaults, and only calls the licence
-// server for whatever is still missing. Anything new gets written back.
+// Vault lookup in front of the CDM: parse the KIDs out of the PSSH, ask the
+// vaults, call the licence server only for what is still missing, and write back
+// anything new.
 
 import { console } from './log';
 import { cekTree } from './module.console';
@@ -20,11 +19,8 @@ function readU32(buf: Buffer, off: number): number {
 	return buf.readUInt32BE(off);
 }
 
-/**
- * Extract Key IDs from a base64 PSSH box.
- * Handles v1 boxes (KIDs in the header), Widevine protobuf payloads (field 2)
- * and PlayReady WRMHEADER XML payloads.
- */
+// Key IDs from a base64 PSSH box: v1 boxes carry them in the header, Widevine
+// payloads in protobuf field 2, PlayReady in WRMHEADER XML.
 export function extractKids(pssh?: string): string[] {
 	if (!pssh) return [];
 	let buf: Buffer;
@@ -137,7 +133,7 @@ export function configureVaults(configs: VaultConfig[] | undefined, workingDir: 
 	}
 }
 
-export function getVaults(service: string): Vaults {
+function getVaults(service: string): Vaults {
 	let v = vaultsByService.get(service);
 	if (!v) {
 		v = buildVaults(service, vaultsEnabled ? vaultConfigs : [], vaultWorkingDir);
@@ -158,14 +154,9 @@ export interface DrmResolveOptions {
 	print?: boolean;
 }
 
-/**
- * Resolve content keys for a PSSH, preferring the vaults.
- *
- * 1. Parse KIDs from the PSSH.
- * 2. Ask the vault chain (local vaults first).
- * 3. If anything is still missing, call the licence server.
- * 4. Push every new key back into the writable vaults.
- */
+// Resolve content keys for a PSSH, vaults first: parse the KIDs, query the vault
+// chain (local before remote), call the licence server for whatever is missing,
+// then push the new keys back into the writable vaults.
 export async function resolveKeys(opts: DrmResolveOptions): Promise<KeyContainerLike[]> {
 	const { service, drm, pssh, licence } = opts;
 	const vaults = getVaults(service);

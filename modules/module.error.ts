@@ -1,8 +1,7 @@
-// Node's fetch reports almost every transport problem as the same opaque
-// "TypeError: fetch failed" and buries the real reason in a nested cause chain.
-// These unwrap it and turn the common codes into something actionable.
+// undici reports most transport failures as a bare "TypeError: fetch failed" and
+// keeps the real reason in the cause chain.
 
-// Unwrap an error (and undici's nested `cause` chain) into one readable line.
+// Flatten an error and its cause chain into one line.
 export function describeError(err: unknown): string {
 	if (err === undefined || err === null) return 'Unknown error';
 	if (typeof err === 'string') return err.trim() || 'Unknown error';
@@ -14,7 +13,7 @@ export function describeError(err: unknown): string {
 	const head = [e.name && e.name !== 'Error' ? e.name : undefined, e.message || undefined].filter(Boolean).join(': ');
 	if (head) parts.push(head);
 
-	// undici nests the real socket error under .cause (sometimes several deep)
+	// undici buries the socket error under .cause, sometimes several levels deep
 	let cause = e.cause;
 	let depth = 0;
 	while (cause && depth++ < 5) {
@@ -28,12 +27,13 @@ export function describeError(err: unknown): string {
 
 	if (e.code && !parts.some((p) => p.includes(String(e.code)))) parts.unshift(`[${e.code}]`);
 
-	// HTTP-style errors carried on the response
+	// HTTP errors carry the status on the response
 	if (e.res?.status) parts.unshift(`HTTP ${e.res.status}${e.res.statusText ? ` ${e.res.statusText}` : ''}`);
 
 	const out = parts.filter(Boolean).join(' -> ');
 	if (out) return out;
-	// last resort: something object-shaped with no name/message/cause
+
+	// last resort: an object with nothing usable on it
 	try {
 		const json = JSON.stringify(err);
 		if (json && json !== '{}') return json;
@@ -43,8 +43,8 @@ export function describeError(err: unknown): string {
 	return 'Unknown error';
 }
 
-// Extract every error code present in the cause chain
-export function errorCodes(err: unknown): string[] {
+// Every error code in the cause chain.
+function errorCodes(err: unknown): string[] {
 	const codes: string[] = [];
 	let cur: any = err;
 	let depth = 0;
@@ -55,10 +55,7 @@ export function errorCodes(err: unknown): string[] {
 	return codes;
 }
 
-/**
- * Turn common transport failures into advice. Returns undefined when the error
- * is not a recognised network problem.
- */
+// Advice for the common transport failures, undefined for anything else.
 export function networkHint(err: unknown): string | undefined {
 	const codes = errorCodes(err).map((c) => c.toUpperCase());
 	const text = `${describeError(err)}`.toUpperCase();

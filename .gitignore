@@ -53,5 +53,3 @@ key_vault.db-wal
 key_vault.db-shm
 key_vault.json
 config/key_vault.*
-cli-preview.html
-demo-output.html

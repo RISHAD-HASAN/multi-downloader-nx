@@ -6,7 +6,8 @@ import Crunchy from './crunchy';
 import Hidive from './hidive';
 import ADN from './adn';
 import packageJson from './package.json';
-import { printBanner, setTheme, theme } from './modules/module.console';
+import { printBanner } from './modules/module.console';
+import { setTheme, theme } from './modules/module.rich';
 import { configureVaults } from './modules/module.drm-cache';
 import { parseUrl } from './modules/module.url';
 
@@ -60,7 +61,7 @@ const applyUrl = (argv: any): boolean => {
 	if (argv.noColor) theme.enabled = false;
 	else if (argv.theme) setTheme(argv.theme);
 
-	// unshackle-style banner (skipped in GUI mode)
+	// banner (skipped in GUI mode)
 	if (process.env.isGUI !== 'true') printBanner(packageJson.version);
 
 	if (argv.debug) console.level = 'debug';

@@ -1,12 +1,9 @@
-// Diagnostics for transport failures.
-// Node's fetch reports nearly every network problem as `TypeError: fetch failed`
-// with the real reason buried in `cause`. A live download died with 300+ lines of
-// `TypeError: fetch failed` / `Part 130: undefined` and no indication of why, so
-// these helpers unwrap the chain and produce an actionable hint.
+// Diagnostics for transport failures: unwrap the cause chain undici hides behind
+// "TypeError: fetch failed" and turn known codes into advice.
 import assert from 'assert';
-import { describeError, errorCodes, networkHint } from '../modules/module.error';
+import { describeError, networkHint } from '../modules/module.error';
 
-// ── 1. real undici errors, produced for real (not hand-built) ──────────────
+// Real undici errors, not hand-built ones
 (async () => {
 	const cases: Array<{ url: string; label: string; expectCode: RegExp }> = [
 		{ url: 'https://no-such-host.invalid/x', label: 'DNS failure', expectCode: /ENOTFOUND|EAI_AGAIN/ },
@@ -22,17 +19,16 @@ import { describeError, errorCodes, networkHint } from '../modules/module.error'
 		}
 		assert.ok(caught, `${c.label}: expected a throw`);
 		const desc = describeError(caught);
-		const codes = errorCodes(caught).join(',');
 
 		// the bare message must no longer be all the user sees
 		assert.notStrictEqual(desc, 'TypeError: fetch failed', `${c.label}: cause was not unwrapped`);
-		assert.ok(c.expectCode.test(codes) || c.expectCode.test(desc), `${c.label}: missing code in "${desc}" (codes: ${codes})`);
+		assert.ok(c.expectCode.test(desc), `${c.label}: missing code in "${desc}"`);
 		assert.ok(networkHint(caught), `${c.label}: no hint produced`);
 		console.log(`✓ ${c.label}: ${desc}`);
 		console.log(`    hint: ${networkHint(caught)}`);
 	}
 
-	// ── 2. the exact shape from the failed download ────────────────────────
+	// The shape a failed download produces
 	const undiciLike = Object.assign(new TypeError('fetch failed'), {
 		cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' })
 	});
@@ -57,14 +53,14 @@ import { describeError, errorCodes, networkHint } from '../modules/module.error'
 	assert.ok(/TLS/i.test(networkHint(tls) ?? ''), 'expected a TLS-specific hint');
 	console.log(`✓ CERT_HAS_EXPIRED: ${describeError(tls)}`);
 
-	// ── 3. degenerate inputs must never throw or print "undefined" ─────────
+	// Degenerate inputs must never throw or print "undefined"
 	for (const bad of [undefined, null, '', 'plain string', new Error(), {}, 0]) {
 		const out = describeError(bad);
 		assert.strictEqual(typeof out, 'string');
 		assert.ok(out.length > 0, `empty description for ${JSON.stringify(bad)}`);
 		assert.ok(!out.includes('undefined'), `"undefined" leaked for ${JSON.stringify(bad)}: ${out}`);
 	}
-	// an Error with no message previously produced a blank failure line
+	// an Error with no message used to produce a blank failure line
 	assert.ok(describeError(new Error()).length > 0);
 	console.log('✓ degenerate inputs never yield empty/"undefined" text');
 
