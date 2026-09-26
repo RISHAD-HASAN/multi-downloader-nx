@@ -489,7 +489,12 @@ Possible Values: und, eng, eng, spa, spa-419, spa-ES, por, por, fra, deu, ara-ME
 
 Set the filename template. Use ${variable_name} to insert variables.
 You can also create folders by inserting a path seperator in the filename
-You may use 'title', 'episode', 'showTitle', 'seriesTitle', 'season', 'width', 'height', 'service' as variables.
+You may use 'title', 'episode', 'showTitle', 'seriesTitle', 'season', 'width', 'height', 'service', 'audio' as variables.
+
+`${audio}` expands to `DUAL.` when more than one audio dub actually finished downloading, and to an empty
+string otherwise. It only ends up in the filename when the template contains it, so a template without
+`${audio}` cannot show the tag - the downloader prints a warning when two dubs completed but the template
+has nowhere to put it.
 #### `--numbers`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 

@@ -38,7 +38,7 @@ import { ServiceClass } from './@types/serviceClassInterface';
 import { CrunchyAndroidEpisodes } from './@types/crunchyAndroidEpisodes';
 import { parse } from './modules/module.transform-mpd';
 import { applyCbrTransform, applyMajinTransform, comparePlaybackStreams, formatBytes, formatDuration, manifestDuration, sizeFromBitrate, type StreamMode, type StreamVariant } from './modules/module.crunchy-quality';
-import { actualAudioTag as completedAudioTag, applyActualAudioTag, DashTransferRegistry, type DashTransferTask } from './modules/module.crunchy-transfer';
+import { applyActualAudioTag, audioTagNotice, DashTransferRegistry, type DashTransferTask } from './modules/module.crunchy-transfer';
 import { AndroidObject, CrunchyMVObject } from './@types/crunchyAndroidObject';
 
 function normalizedSeasonNumber(title: string | undefined, value: number | string | undefined): number {
@@ -88,6 +88,12 @@ export default class Crunchy implements ServiceClass {
 		this.token = yamlCfg.loadCRToken();
 		this.req = new reqModule.Req();
 		this.locale = 'en-US';
+	}
+
+	// DRM precondition, kept as a method so the download flow can also be driven
+	// without a CDM installed (tests, GUI dry runs).
+	protected cdmAvailable(): boolean {
+		return canDecrypt;
 	}
 
 	public checkToken(): boolean {
@@ -1996,7 +2002,7 @@ export default class Crunchy implements ServiceClass {
 			const vpbStreams = pbData.vpb;
 			const apbStreams = pbData.apb;
 
-			if (!options.listFormats && !options.F && !canDecrypt && (!options.novids || !options.noaudio)) {
+			if (!options.listFormats && !options.F && !this.cdmAvailable() && (!options.novids || !options.noaudio)) {
 				console.error('No valid Widevine or PlayReady CDM detected. Please ensure a supported and functional CDM is installed.');
 				return undefined;
 			}
@@ -3146,13 +3152,17 @@ export default class Crunchy implements ServiceClass {
 
 		// The ${audio} variable is seeded from the requested dubs; base the final
 		// filename on the audio tracks that actually completed instead, so a
-		// failed second dub does not keep "DUAL." in the name.
+		// failed second dub does not keep "DUAL." in the name. A template without
+		// ${audio} has nowhere to put the tag, so that is reported rather than
+		// silently dropped.
 		if (files.some((file) => file.type === 'Audio' || file.type === 'Video')) {
-			const actualAudioTag = completedAudioTag(files);
-			if (applyActualAudioTag(variables, files) && fileName) {
+			const requestedDual = variables.some((variable) => variable.name === 'audio' && variable.replaceWith === 'DUAL.');
+			if (applyActualAudioTag(variables, files, options.fileName) && fileName) {
 				fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
-				console.debug(`Audio tag set to '${actualAudioTag || 'none'}' from completed audio tracks`);
 			}
+			const notice = audioTagNotice(files, options.fileName, requestedDual);
+			if (notice?.level === 'warn') console.warn(notice.message);
+			else if (notice) console.info(notice.message);
 		}
 		this.pendingDashTransfers.clear();
 
