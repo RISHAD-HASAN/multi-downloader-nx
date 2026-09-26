@@ -133,13 +133,24 @@ Some of these needed fixing before they'd work:
   renderer.
 - `Req.getData` logged non-OK responses before the `silent` check, so the majin
   probe's expected 404 showed up as an error.
+- The `DUAL.` filename tag came from the number of dubs *requested*, so a second
+  dub that failed to download still left `DUAL.` in the final name. The tag is
+  now recomputed from the audio tracks that actually completed before the output
+  filename is built (`actualAudioTag` in `crunchy.ts`).
+- FFmpeg muxing never set a default audio track while mkvmerge did, so players
+  could pick the wrong dub. `Merger.defaultAudioIndex()` finds the stream that
+  matches the configured default audio language, and FFmpeg gets
+  `-disposition:a:N default` (and `0` on the rest) whenever there is a choice.
 
 ## Not done
 
-Downloads are still sequential - video, then each dub. Overlapping them means a
-real refactor of `downloadMediaList` and, more to the point, multiplying the
-number of live connections against a CDN that already throttles at higher
-`--partsize`. Would need a shared concurrency budget, not just `Promise.all`.
+Within one episode the video and audio DASH tracks now overlap -
+`module.crunchy-transfer.ts` starts both transfers as a batch, tracks which are
+in flight, waits for every sibling to settle before surfacing a failure, and
+records which audio tracks completed. Dubs are still sequential between
+themselves, and the CDN concern stands: overlapping tracks multiplies the number
+of live connections against a CDN that already throttles at higher `--partsize`.
+A shared concurrency budget across dubs and episodes is still open.
 
 ## Tests
 
@@ -147,10 +158,12 @@ number of live connections against a CDN that already throttles at higher
 pnpm test:all
 ```
 
-Eleven suites: `vault`, `console`, `build`, `download-ui`, `error`, `majin`,
-`bin`, `upstream`, `archive`, `filename`, `listing`. They cover vault round-trips
-and PSSH parsing, the console renderer (including `%s` formatting and CJK
-widths), the packaged-build config manifest, live-view wiring, error unwrapping
-against real undici failures, offline Majin/CBR comparisons, binary discovery,
-format-only exits, CMS/content-API fallbacks, corrupt-archive recovery, filename
-rules, and listing modes.
+Twelve suites: `vault`, `console`, `build`, `download-ui`, `error`, `majin`,
+`bin`, `upstream`, `archive`, `filename`, `listing`, `crunchy-concurrency`. They
+cover vault round-trips and PSSH parsing, the console renderer (including `%s`
+formatting and CJK widths), the packaged-build config manifest, live-view
+wiring, error unwrapping against real undici failures, offline Majin/CBR
+comparisons, binary discovery, format-only exits, CMS/content-API fallbacks,
+corrupt-archive recovery, filename rules, listing modes, and the concurrent DASH
+transfer batch (track overlap, failure isolation, completed-audio DUAL tagging
+and FFmpeg default-audio dispositions).

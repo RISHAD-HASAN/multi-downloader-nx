@@ -170,6 +170,18 @@ class Merger {
 			audioIndex++;
 		}
 
+		// Mirror mkvmerge's --default-track handling: flag the audio stream that
+		// matches the configured default language and clear the flag on the rest.
+		// A single audio track keeps FFmpeg's own default, so only act when the
+		// output really carries a track choice.
+		const audioTrackCount = this.options.videoAndAudio.length + this.options.onlyAudio.length;
+		if (audioTrackCount > 1) {
+			const defaultAudio = this.defaultAudioIndex();
+			for (let streamIndex = 0; streamIndex < audioTrackCount; streamIndex++) {
+				metaData.push(`-disposition:a:${streamIndex} ${streamIndex === defaultAudio ? 'default' : '0'}`);
+			}
+		}
+
 		for (const index in this.options.subtitles) {
 			const sub = this.options.subtitles[index];
 			if (sub.delay) {
@@ -211,6 +223,16 @@ class Merger {
 		args.push(...this.options.options.ffmpeg);
 		args.push(`"${this.options.output}"`);
 		return args.join(' ');
+	}
+
+	// Index of the audio stream that should carry the "default" disposition when
+	// muxing with FFmpeg: the first track matching the configured default audio
+	// language, in mapping order (videoAndAudio tracks first, then onlyAudio
+	// tracks). Returns -1 when no track matches.
+	public defaultAudioIndex(): number {
+		const wanted = this.options.defaults?.audio?.code;
+		if (!wanted) return -1;
+		return [...this.options.videoAndAudio, ...this.options.onlyAudio].findIndex((track) => track.lang?.code === wanted);
 	}
 
 	public static getLanguageCode = (from: string, _default = 'eng'): string => {
