@@ -586,8 +586,8 @@ Show the help output
 ## Content Key Vaults
 
 A vault caches `KID -> CONTENT KEY` pairs per service. When a title is
-re-downloaded  -  or when another dub/season shares the same keys  -  aniDL reads
-the key straight from the vault and never contacts the licence server.
+re-downloaded - or when another dub or season shares the same keys - aniDL reads
+the key from the vault and never contacts the licence server.
 
 Configure in `config/vaults.yml`:
 
@@ -602,7 +602,7 @@ key_vaults:
   #   name: 'Local JSON Vault'
   #   path: './config/key_vault.json'
 
-  # - type: API             # remote HTTP vault (unshackle API protocol)
+  # - type: API             # remote HTTP vault
   #   name: 'Team Vault'
   #   uri: 'https://vault.example.com/api'
   #   token: 'your-secret-key'
@@ -612,7 +612,7 @@ key_vaults:
 Local vaults are always queried before network vaults. Keys obtained from a
 licence are written back to every vault that does not set `no_push: true`.
 
-Schema matches devine/unshackle vaults, so `path` can point at an existing
+The schema matches devine's vaults, so `path` can point at an existing
 `key_vault.db`.
 
 ## Console Theming
@@ -625,4 +625,3 @@ Schema matches devine/unshackle vaults, so `path` can point at an existing
 Environment overrides: `ANIDL_THEME`, `ANIDL_NO_COLOR`, `ANIDL_LOG_LEVEL`
 (`debug`/`info`/`warning`/`error`).
 
-See `cli-preview.html` for a rendered sample of every palette.
