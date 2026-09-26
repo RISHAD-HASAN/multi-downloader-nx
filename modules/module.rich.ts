@@ -1,7 +1,5 @@
-// Small reimplementation of the parts of Python's rich that the console layer
-// needs: themes, markup, panels/trees/tables, progress bars and a Live region.
-// Deliberately dependency free. The Node ports either don't do the Live/refresh
-// bit properly or pull in far too much.
+// The subset of Python's rich the console layer needs: themes, markup,
+// panels/trees/tables, progress bars and a Live region. No dependencies.
 
 import { format as nodeFormat, inspect as nodeInspectRaw } from 'util';
 
@@ -214,7 +212,7 @@ export class Theme {
 			u: { underline: true },
 			strike: { strike: true },
 
-			// rich semantic styles used by unshackle
+			// rich semantic styles
 			'ascii.art': { ...col('pink'), bold: true },
 			'rule.line': col('dark_gray'),
 			'rule.text': { ...col('pink'), bold: true },
@@ -361,11 +359,8 @@ export function truncateVisible(s: string, width: number, ellipsis = '…'): str
 	return out + ellipsis + RESET;
 }
 
-/**
- * Render rich-style console markup: `[cyan]hi[/]`, `[bold red]x[/bold red]`,
- * `[repr.number]5[/]`. Unknown tags are left as literal text (rich behaviour).
- * Escape a literal bracket with `\[`.
- */
+// Render rich-style console markup: `[cyan]hi[/]`, `[bold red]x[/bold red]`,
+// `[repr.number]5[/]`. Unknown tags stay literal; `\[` escapes a bracket.
 export function renderMarkup(input: string, base: Style = {}): string {
 	if (!theme.enabled) return stripMarkup(input);
 	const stack: Style[] = [base];
@@ -586,7 +581,7 @@ function unpackPadding(p: PaddingDims): [number, number, number, number] {
 	return p;
 }
 
-// rich.padding.Padding - the (0, 5) indent that gives unshackle its look.
+// rich.padding.Padding - the (0, 5) indent the console is built around
 export class Padding implements Renderable {
 	constructor(
 		public inner: RenderInput,
@@ -689,7 +684,7 @@ export class Panel implements Renderable {
 	}
 }
 
-// rich.tree.Tree
+// rich.tree.Tree - a labelled branch with children
 export class Tree implements Renderable {
 	public children: Tree[] = [];
 	constructor(
@@ -736,10 +731,8 @@ export interface ColumnSpec {
 	noWrap?: boolean;
 }
 
-/**
- * rich.table.Table - supports `Table.grid()` (invisible layout table, what
- * unshackle uses everywhere) and bordered tables with headers.
- */
+// rich.table.Table - `Table.grid()` for invisible layout tables, plus bordered
+// tables with headers.
 export class Table implements Renderable {
 	public rows: RenderInput[][] = [];
 	public columns: ColumnSpec[] = [];
@@ -915,10 +908,8 @@ export function formatDuration(secs: number, compact = true): string {
 	return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/**
- * unshackle's GradientPulseBarColumn: a bar that blends pink->blue across the
- * completed portion and animates a pulse while the task total is unknown.
- */
+// A bar that blends pink->blue across the completed portion and pulses while
+// the task total is unknown.
 export class GradientBar implements Renderable {
 	constructor(
 		public task: TaskState,
@@ -1114,10 +1105,8 @@ export class Progress implements Renderable {
 	}
 }
 
-/**
- * rich.live.Live - repaints a renderable in place. Falls back to a single
- * final render when stdout is not a TTY (CI logs, GUI mode, piped output).
- */
+// rich.live.Live - repaints a renderable in place, and falls back to a single
+// final render when stdout is not a TTY.
 export class Live {
 	private timer?: NodeJS.Timeout;
 	private lastHeight = 0;
@@ -1196,11 +1185,9 @@ export class Live {
 
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 
-/**
- * Reproduce log4js/`util.format` argument handling so existing call sites such
- * as `console.info('Your Country: %s', country)` keep substituting correctly.
- * Errors render as their stack, matching the previous logger.
- */
+// log4js/`util.format` argument handling, so call sites like
+// `console.info('Your Country: %s', country)` keep substituting. Errors render
+// as their stack, as the old logger did.
 export function formatArgs(args: any[]): string {
 	if (args.length === 0) return '';
 	const mapped = args.map((a) => (a instanceof Error ? a.stack || a.message : a));
@@ -1221,10 +1208,7 @@ export interface RichConsoleOptions {
 	logPadding?: PaddingDims;
 }
 
-/**
- * ComfyConsole equivalent: the padded, level-column log renderer that gives
- * unshackle its signature output, plus print/rule/panel helpers.
- */
+// The logger: padded, level-column output plus print/rule/panel helpers.
 export class RichConsole {
 	public stream: NodeJS.WriteStream;
 	public showTime: boolean;
@@ -1331,7 +1315,7 @@ export class RichConsole {
 			gutter += (t === this.lastTime ? ' '.repeat(textWidth(t)) : renderMarkup(`[log.time]${t}[/]`)) + ' ';
 			this.lastTime = t;
 		}
-		// INFO is the "quiet" default level: no label, matching unshackle's look
+		// INFO is the quiet default level: no label
 		const showLabel = level !== 'info';
 		const levelCol = showLabel ? this.levelText(level) + ' ' : '';
 		const indent = left;
@@ -1349,12 +1333,12 @@ export class RichConsole {
 	// Alias kept for drop-in compatibility with the old log4js logger
 	log = (...a: any[]) => this.writeLog('info', ...a);
 
-	// `console.print(Padding(Rule(...), (1, 2)))` - unshackle's section header.
+	// Section header: a padded rule with an optional centred title
 	rule(title = '', pad: PaddingDims = [1, 2]) {
 		this.print(new Padding(new Rule(title), pad));
 	}
 
-	// A transient spinner status line, padded like unshackle's
+	// A transient spinner status line
 	status(text: RenderInput, pad: PaddingDims = [0, 5]): Live {
 		return new Live(new Padding(new Spinner(text), pad), { console: this, transient: true, refreshPerSecond: 12.5 }).start();
 	}
