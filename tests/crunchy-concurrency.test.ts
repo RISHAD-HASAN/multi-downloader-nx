@@ -153,7 +153,10 @@ function testApplyAudioTag() {
 function testCrunchyWiring() {
 	const source = fs.readFileSync(path.join(__dirname, '..', 'crunchy.ts'), 'utf8');
 	assert.ok(source.includes('private pendingDashTransfers = new DashTransferRegistry();'), 'crunchy.ts must own a DASH transfer registry');
-	assert.ok(source.includes('await this.pendingDashTransfers.runAll(dashTransfers);'), 'video and audio DASH tracks must download as one concurrent batch');
+	assert.ok(source.includes('videoJobs.push(videoJob)'), 'video must run independently of the dub loop');
+	assert.ok(source.includes("await finishTrack('audio');"), 'audio must decrypt inside its own transfer');
+	assert.ok(source.includes('await Promise.all(videoJobs);'), 'video jobs must drain before returning');
+	assert.ok(source.includes('await Helper.decrypt(binary, args);'), 'decryption must not block network transfers');
 	assert.ok(source.includes('const actualAudioTag = completedAudioTag(files);'), 'the DUAL tag must be recomputed from completed audio');
 	assert.ok(source.includes('applyActualAudioTag(variables, files)'), 'the filename variable must be updated before the final name is built');
 	console.log('✓ crunchy.ts wires concurrent DASH transfers and the completed-audio tag');
@@ -165,6 +168,17 @@ async function testMergerDefaultAudio() {
 	try {
 		await import('../modules/log'); // initialize the shared config/logger cycle
 		const [{ default: Merger }, { languages }] = await Promise.all([import('../modules/module.merger'), import('../modules/module.langsData')]);
+		const { default: Helper } = await import('../modules/module.helper');
+		let ticked = false;
+		const timer = setTimeout(() => { ticked = true; }, 10);
+		await Helper.decrypt(process.execPath, ['-e', 'setTimeout(() => {}, 80)']);
+		clearTimeout(timer);
+		assert.equal(ticked, true, 'decryption must leave the event loop available to downloads');
+		await assert.rejects(Helper.decrypt(process.execPath, ['-e', 'console.error("secret-key"); process.exit(7)']), (error: Error) => {
+			assert.equal(error.message, 'Decryption failed with exit code 7');
+			assert.ok(!error.message.includes('secret-key'));
+			return true;
+		});
 		const eng = languages.find((l) => l.code === 'eng')!;
 		const spa = languages.find((l) => l.code === 'spa')!;
 		const jpn = languages.find((l) => l.code === 'jpn')!;
