@@ -38,6 +38,7 @@ import { ServiceClass } from './@types/serviceClassInterface';
 import { CrunchyAndroidEpisodes } from './@types/crunchyAndroidEpisodes';
 import { parse } from './modules/module.transform-mpd';
 import { applyCbrTransform, applyMajinTransform, comparePlaybackStreams, formatBytes, formatDuration, manifestDuration, sizeFromBitrate, type StreamMode, type StreamVariant } from './modules/module.crunchy-quality';
+import { actualAudioTag as completedAudioTag, applyActualAudioTag, DashTransferRegistry, type DashTransferTask } from './modules/module.crunchy-transfer';
 import { AndroidObject, CrunchyMVObject } from './@types/crunchyAndroidObject';
 
 function normalizedSeasonNumber(title: string | undefined, value: number | string | undefined): number {
@@ -78,6 +79,9 @@ export default class Crunchy implements ServiceClass {
 		cms_beta?: Record<string, string>;
 		cms_web?: Record<string, string>;
 	} = {};
+	// In-flight DASH track transfers. The video track and every audio dub are
+	// written to separate files, so they are downloaded concurrently as a batch.
+	private pendingDashTransfers = new DashTransferRegistry();
 
 	constructor(private debug = false) {
 		this.cfg = yamlCfg.loadCfg();
@@ -2424,12 +2428,17 @@ export default class Crunchy implements ServiceClass {
 
 						let [audioDownloaded, videoDownloaded] = [false, false];
 
+						const transferMediaId = currentVersion ? currentVersion.guid : currentMediaId;
+						const skipVideoTransfer = Boolean(dlVideoOnce && options.dlVideoOnce) || Boolean(options.novids);
+
 						// When best selected video quality is already downloaded
 						if (dlVideoOnce && options.dlVideoOnce) {
 							console.debug('Already downloaded video, skipping video download...');
 						} else if (options.novids) {
 							console.info('Skipping video download...');
-						} else {
+						}
+
+						const transferVideoDash = async () => {
 							//Download Video
 							const totalParts = chosenVideoSegments.segments.length;
 							const mathParts = Math.ceil(totalParts / options.partsize);
@@ -2473,9 +2482,9 @@ export default class Crunchy implements ServiceClass {
 							}
 							dlVideoOnce = true;
 							videoDownloaded = true;
-						}
+						};
 
-						if (chosenAudioSegments && !options.noaudio) {
+						const transferAudioDash = async () => {
 							//Download Audio (if available)
 							const totalParts = chosenAudioSegments.segments.length;
 							const mathParts = Math.ceil(totalParts / options.partsize);
@@ -2518,9 +2527,31 @@ export default class Crunchy implements ServiceClass {
 								trackState(audioTrackKey, 'Downloaded');
 							}
 							audioDownloaded = true;
-						} else if (options.noaudio) {
+						};
+
+						const wantAudioTransfer = Boolean(chosenAudioSegments) && !options.noaudio;
+						if (!wantAudioTransfer && options.noaudio) {
 							console.info('Skipping audio download...');
 						}
+
+						// The video and audio DASH tracks are independent transfers writing
+						// to separate files, so run them concurrently and await them as one
+						// batch instead of streaming them one after the other.
+						const dashTransfers: DashTransferTask[] = [];
+						if (!skipVideoTransfer) {
+							dashTransfers.push({ key: `video|${transferMediaId}`, kind: 'video', mediaId: transferMediaId, task: transferVideoDash });
+						}
+						if (wantAudioTransfer) {
+							dashTransfers.push({
+								key: `${audioTrackKey}|${transferMediaId}`,
+								kind: 'audio',
+								mediaId: transferMediaId,
+								langCode: lang.code,
+								task: transferAudioDash
+							});
+						}
+						await this.pendingDashTransfers.runAll(dashTransfers);
+						this.pendingDashTransfers.clear(transferMediaId);
 
 						//Handle Decryption if needed
 						if (
@@ -3187,6 +3218,18 @@ export default class Crunchy implements ServiceClass {
 		}
 		endSession();
 		console.info('[green][MDNX] All stream downloads & decryption completed.[/]');
+
+		// The ${audio} variable is seeded from the requested dubs; base the final
+		// filename on the audio tracks that actually completed instead, so a
+		// failed second dub does not keep "DUAL." in the name.
+		if (files.some((file) => file.type === 'Audio' || file.type === 'Video')) {
+			const actualAudioTag = completedAudioTag(files);
+			if (applyActualAudioTag(variables, files) && fileName) {
+				fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
+				console.debug(`Audio tag set to '${actualAudioTag || 'none'}' from completed audio tracks`);
+			}
+		}
+		this.pendingDashTransfers.clear();
 
 		let finalOutBase = './unknown';
 		if (fileName) {
