@@ -7,11 +7,13 @@ import Helper from './module.helper';
  * Scene-style naming: collapse whitespace and punctuation into dots.
  * Handles spaces, commas, colons (incl. the full-width U+FF1A that Windows
  * substitutes), semicolons, question/exclamation marks, quotes, brackets and
- * dashes, then squeezes repeats and trims stray dots.
+ * dashes, then squeezes repeats and trims stray dots. In-word apostrophes
+ * (Journey's, Don't, O'Brien) fold into the word rather than a dot.
  */
 const replaceWhitespaceWithDots = (input: string): string => {
 	return input
 		.replace(/\s+/g, '.')
+		.replace(/([\p{L}\p{N}])['’](?=[\p{L}\p{N}])/gu, '$1')
 		.replace(/[,;:\uFF1A\uFF0C\u2013\u2014\-!?'"“”‘’`(){}[\]<>|~^&+=@#$%]/g, '.')
 		.replace(/\.{2,}/g, '.')
 		.replace(/^\.+|\.+$/g, '');
