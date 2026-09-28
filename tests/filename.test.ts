@@ -1,5 +1,6 @@
 // Scene-style filenames: whitespace and punctuation collapse into dots, including
-// the full-width colon (U+FF1A) Windows substitutes for ':'.
+// the full-width colon (U+FF1A) Windows substitutes for ':'. In-word apostrophes
+// fold into the word instead of becoming dots.
 import assert from 'node:assert/strict';
 import parseFileName, { type Variable } from '../modules/module.filename';
 
@@ -14,7 +15,14 @@ const cases: Array<[string, string]> = [
 	['Mushoku Tensei: Jobless Reincarnation', 'Mushoku.Tensei.Jobless.Reincarnation'],
 	['Burn Bright, Mad Dog', 'Burn.Bright.Mad.Dog'],
 	['Another Domestic Disaster?', 'Another.Domestic.Disaster'],
-	['The Journey’s End', 'The.Journey.s.End'],
+	['The Journey’s End', 'The.Journeys.End'],
+	['The.Journey\'s.End', 'The.Journeys.End'],
+	['JoJo\'s Bizarre Adventure', 'JoJos.Bizarre.Adventure'],
+	['Don\'t Stop Me Now', 'Dont.Stop.Me.Now'],
+	['O\'Brien\'s Pub', 'OBriens.Pub'],
+	['James\' Journey', 'James.Journey'],
+	['Rock \'n\' Roll', 'Rock.n.Roll'],
+	['\'Twas the Night\'', 'Twas.the.Night'],
 	['A King-Class Water Mage', 'A.King.Class.Water.Mage'],
 	['[Crunchyroll] Show (2026)', 'Crunchyroll.Show.2026'],
 	['Turning   Point    4', 'Turning.Point.4'],
@@ -32,7 +40,6 @@ for (const [input, expected] of cases) {
 }
 console.log(`✓ ${cases.length} filenames collapse to dots, no stray or doubled dots`);
 
-// Underscores are dropped
 assert.strictEqual(name('Frieren_Beyond_Journeys_End'), 'FrierenBeyondJourneysEnd');
 console.log('✓ underscores are dropped');
 
