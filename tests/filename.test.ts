@@ -40,7 +40,6 @@ for (const [input, expected] of cases) {
 }
 console.log(`✓ ${cases.length} filenames collapse to dots, no stray or doubled dots`);
 
-// Underscores are dropped
 assert.strictEqual(name('Frieren_Beyond_Journeys_End'), 'FrierenBeyondJourneysEnd');
 console.log('✓ underscores are dropped');
 
