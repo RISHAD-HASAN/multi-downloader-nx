@@ -12,38 +12,17 @@ export type ItemType = {
 }[];
 
 export type DataType = {
-	hidive: {
-		s: ItemType;
-	};
-	adn: {
-		s: ItemType;
-	};
 	crunchy: {
 		srz: ItemType;
 		s: ItemType;
 	};
 };
 
-const addToArchive = (
-	kind:
-		| {
-				service: 'crunchy';
-				type: 's' | 'srz';
-		  }
-		| {
-				service: 'hidive';
-				type: 's';
-		  }
-		| {
-				service: 'adn';
-				type: 's';
-		  },
-	ID: string
-) => {
+const addToArchive = (kind: { service: 'crunchy'; type: 's' | 'srz' }, ID: string) => {
 	const data = loadData();
 
 	if (Object.prototype.hasOwnProperty.call(data, kind.service)) {
-		const items = kind.service === 'crunchy' ? data[kind.service][kind.type] : data[kind.service][kind.type];
+		const items = data[kind.service][kind.type];
 		if (items.findIndex((a) => a.id === ID) >= 0)
 			// Prevent duplicate
 			return;
@@ -51,78 +30,42 @@ const addToArchive = (
 			id: ID,
 			already: []
 		});
-		(data as any)[kind.service][kind.type] = items;
+		data[kind.service][kind.type] = items;
 	} else {
-		if (kind.service === 'crunchy') {
-			data['crunchy'] = {
-				s: ([] as ItemType).concat(
-					kind.type === 's'
-						? {
-								id: ID,
-								already: [] as string[]
-							}
-						: []
-				),
-				srz: ([] as ItemType).concat(
-					kind.type === 'srz'
-						? {
-								id: ID,
-								already: [] as string[]
-							}
-						: []
-				)
-			};
-		} else if (kind.service === 'adn') {
-			data['adn'] = {
-				s: [
-					{
-						id: ID,
-						already: []
-					}
-				]
-			};
-		} else {
-			data['hidive'] = {
-				s: [
-					{
-						id: ID,
-						already: []
-					}
-				]
-			};
-		}
+		data['crunchy'] = {
+			s: ([] as ItemType).concat(
+				kind.type === 's'
+					? {
+							id: ID,
+							already: [] as string[]
+						}
+					: []
+			),
+			srz: ([] as ItemType).concat(
+				kind.type === 'srz'
+					? {
+							id: ID,
+							already: [] as string[]
+						}
+					: []
+			)
+		};
 	}
 	fs.writeFileSync(archiveFile, JSON.stringify(data, null, 4));
 };
 
-const downloaded = (
-	kind:
-		| {
-				service: 'crunchy';
-				type: 's' | 'srz';
-		  }
-		| {
-				service: 'hidive';
-				type: 's';
-		  }
-		| {
-				service: 'adn';
-				type: 's';
-		  },
-	ID: string,
-	episode: string[]
-) => {
+const downloaded = (kind: { service: 'crunchy'; type: 's' | 'srz' }, ID: string, episode: string[]) => {
 	let data = loadData();
 	if (
 		!Object.prototype.hasOwnProperty.call(data, kind.service) ||
 		!Object.prototype.hasOwnProperty.call(data[kind.service], kind.type) ||
-		!Object.prototype.hasOwnProperty.call((data as any)[kind.service][kind.type], ID)
+		!Object.prototype.hasOwnProperty.call(data[kind.service][kind.type], ID)
 	) {
 		addToArchive(kind, ID);
 		data = loadData(); // Load updated version
 	}
 
-	const archivedata = kind.service == 'crunchy' ? data[kind.service][kind.type] : data[kind.service][kind.type];
+	const archivedata = data[kind.service][kind.type];
 	const alreadyData = archivedata.find((a) => a.id === ID)?.already;
 	for (const ep of episode) {
 		if (alreadyData?.includes(ep)) continue;
@@ -131,7 +74,7 @@ const downloaded = (
 	fs.writeFileSync(archiveFile, JSON.stringify(data, null, 4));
 };
 
-const makeCommand = (service: 'crunchy' | 'hidive' | 'adn'): Partial<ArgvType>[] => {
+const makeCommand = (service: 'crunchy' = 'crunchy'): Partial<ArgvType>[] => {
 	const data = loadData();
 	const ret: Partial<ArgvType>[] = [];
 	const kind = data[service];

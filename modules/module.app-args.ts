@@ -61,7 +61,7 @@ export let argvC: {
 	dubLang: string[];
 	all: boolean;
 	fontSize: number;
-	combineLines: boolean;
+
 	allDubs: boolean;
 	timeout: number;
 	waittime: number;
@@ -77,14 +77,14 @@ export let argvC: {
 	rawoutput: string;
 	nocleanup: boolean;
 	help: boolean | undefined;
-	service: 'crunchy' | 'hidive' | 'adn';
+	service: 'crunchy';
 	update: boolean;
 	fontName: string | undefined;
 	_: (string | number)[];
 	$0: string;
 	dlVideoOnce: boolean;
 	chapters: boolean;
-	removeBumpers: boolean;
+
 	originalFontSize: boolean;
 	keepAllVideos: boolean;
 	syncTiming: boolean;

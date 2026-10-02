@@ -1,7 +1,4 @@
-// DASH track bookkeeping for Crunchyroll. Video and each audio dub go to separate
-// files, so they transfer concurrently; the registry tracks per-track state,
-// records which dubs completed (the DUAL filename tag), and reports the first
-// error once every sibling transfer has settled.
+// DASH track bookkeeping: per-track state, completed dubs, first error.
 
 export type DashTransferKind = 'video' | 'audio';
 
@@ -88,9 +85,7 @@ export class DashTransferRegistry {
 		return promise;
 	}
 
-	// Start every transfer at once, wait for all of them to settle, then rethrow
-	// the first failure: one dead track aborts the episode without abandoning a
-	// sibling that is still writing to disk.
+	// start them all, wait for all of them, then rethrow the first failure
 	public async runAll(entries: DashTransferTask[]): Promise<void> {
 		if (entries.length === 0) return;
 		const settled = await Promise.allSettled(entries.map((entry) => this.run(entry)));
@@ -119,9 +114,7 @@ type AudioTagVariable = {
 	replaceWith: string | number;
 };
 
-// Distinct audio languages that finished downloading. DASH episodes produce one
-// Audio file per dub; the HLS fallback muxes audio into the video, so distinct
-// Video languages stand in when there are no Audio files.
+// Distinct audio languages that finished; HLS falls back to the video tracks.
 export const completedAudioLanguages = (files: TaggedFile[]): string[] => {
 	const audio = files.filter((file) => file.type === 'Audio' && file.lang?.code);
 	const source = audio.length > 0 ? audio : files.filter((file) => file.type === 'Video' && file.lang?.code);
@@ -136,9 +129,7 @@ export const actualAudioTag = (files: TaggedFile[]): string => (completedAudioLa
 // template without it has nowhere to put the tag.
 export const templateHasAudioTag = (template: string | undefined): boolean => /\$\{audio\}/.test(template ?? '');
 
-// Rewrite the ${audio} variable in place, seeding one when the template asks for
-// it but the download path never created it. Returns true when the variable list
-// changed, i.e. the caller has to rebuild the filename.
+// Rewrite ${audio} in place; true means the filename has to be rebuilt.
 export const applyActualAudioTag = (variables: AudioTagVariable[], files: TaggedFile[], template?: string): boolean => {
 	const tag = actualAudioTag(files);
 	let changed = false;

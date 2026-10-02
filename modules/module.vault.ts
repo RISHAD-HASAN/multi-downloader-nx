@@ -1,6 +1,4 @@
-// Content key vaults: KID -> content key per service, so re-downloading a title
-// (or another dub that shares keys) never hits the licence server again. Local
-// vaults are checked before network ones.
+// Content key vaults: KID -> key per service, checked before the licence server.
 
 import fs from 'fs';
 import path from 'path';
@@ -390,17 +388,7 @@ export interface VaultConfig {
 	no_push?: boolean;
 }
 
-// Build the vault chain from `config/vaults.yml`:
-//
-//   key_vaults:
-//     - type: SQLite
-//       name: "Local Vault"
-//       path: "./config/key_vault.db"
-//     - type: API
-//       name: "Team Vault"
-//       uri: "https://vault.example.com/api"
-//       token: "..."
-//       no_push: false
+// Build the vault chain from `config/vaults.yml` (see `config/vaults.yml`).
 export function buildVaults(service: string, configs: VaultConfig[] | undefined, workingDir: string): Vaults {
 	const vaults = new Vaults(service);
 	if (!configs?.length) return vaults;

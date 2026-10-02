@@ -11,7 +11,7 @@ import path from 'node:path';
 	process.argv = [...savedArgs, '--service', 'crunchy'];
 	try {
 		await import('../modules/log'); // initialize the config/logger cycle first
-		const [{ default: Crunchy }, { default: ADN }, { default: Hidive }] = await Promise.all([import('../crunchy'), import('../adn'), import('../hidive')]);
+		const { default: Crunchy } = await import('../crunchy');
 		const neverDownload = () => {
 			throw new Error('format listing must not mux or download');
 		};
@@ -21,39 +21,16 @@ import path from 'node:path';
 		crunchy.muxStreams = neverDownload;
 		assert.equal(await crunchy.downloadEpisode({ seasonID: 'TEST', e: '1' }, { listFormats: true }), true);
 
-		const adn: any = Object.create(ADN.prototype);
-		adn.downloadEpisode = async () => ({ data: [], fileName: '', error: false });
-		adn.muxStreams = neverDownload;
-		assert.equal((await adn.getEpisode({ id: 1 }, { F: true })).isOk, true);
-
-		const hidive: any = Object.create(Hidive.prototype);
-		hidive.cfg = { bin: { ffmpeg: '/unused' } };
-		const formats = await hidive.downloadMPD(
-			{ cdn: { video: [{ bandwidth: 2_000_000, quality: { width: 1280, height: 720 }, segments: [] }], audio: [{ bandwidth: 128_000, segments: [] }] } },
-			[],
-			{ title: 'Test', seasonTitle: 'Test', seriesTitle: 'Test', episodeInformation: { seasonNumber: 1, episodeNumber: 1 } },
-			{ F: true, x: 1, q: 0 }
-		);
-		assert.deepEqual(formats, { data: [], fileName: '', error: false });
 		const crunchySource = fs.readFileSync(path.join(__dirname, '..', 'crunchy.ts'), 'utf8');
 		assert.ok(crunchySource.includes('if (!options.listFormats && !options.F && !this.cdmAvailable()'), 'format listing should work without a CDM');
 		assert.ok(crunchySource.includes('protected cdmAvailable(): boolean'), 'the CDM check must stay overridable so tests and dry runs do not need a CDM');
 		assert.ok(crunchySource.includes('if (!options.listFormats && !options.F && !this.cfg.bin.mp4decrypt'), 'format listing should work without a decryptor');
-		console.log('✓ format listing skips mux/archive in Crunchyroll and ADN, and bypasses CDM checks');
+		console.log('✓ format listing skips mux/archive and bypasses the CDM check');
 
-		// Transfer/decrypt wiring: audio must not queue behind the whole video,
-		// decryption must not block the event loop, and a finished track must be
-		// renamed into place instead of being copied a second time.
-		const hidiveSource = fs.readFileSync(path.join(__dirname, '..', 'hidive.ts'), 'utf8');
 		const mergerSource = fs.readFileSync(path.join(__dirname, '..', 'modules', 'module.merger.ts'), 'utf8');
-		assert.ok(hidiveSource.includes('const videoJob = (async () => {'), 'HIDIVE video transfer must run as its own job');
-		assert.ok(hidiveSource.includes('await Promise.all([videoJob, audioJob]);'), 'HIDIVE audio must transfer while the video is still running');
-		assert.ok(!hidiveSource.includes('const decryptVideo = Helper.exec('), 'HIDIVE decryption must not block the event loop');
-		assert.ok(hidiveSource.includes('await Helper.execAsync('), 'HIDIVE must use the background subprocess runner');
-		assert.ok(hidiveSource.includes('Helper.moveFile('), 'HIDIVE must rename finished tracks instead of copying them');
-		assert.ok(crunchySource.includes('Helper.moveFile(output, destination);'), 'Crunchyroll must rename decrypted tracks instead of copying them');
+		assert.ok(crunchySource.includes('Helper.moveFile(output, destination);'), 'finished tracks must be renamed, not copied');
 		assert.ok(mergerSource.includes('await Helper.execAsync(type'), 'muxing must not block the event loop');
-		console.log('✓ transfers run concurrently and finished tracks are renamed, not copied');
+		console.log('✓ finished tracks are renamed and muxing does not block the event loop');
 
 		const cms = { bucket: '/test', policy: 'test', signature: 'test', key_pair_id: 'test' };
 		const json = (value: unknown) => ({ ok: true, res: new Response(JSON.stringify(value)) });
@@ -113,9 +90,7 @@ import path from 'node:path';
 		assert.deepEqual(parseFileName('${title}', vars, 2, ["title='Overridden'"]), ['Overridden']);
 		assert.deepEqual(parseFileName('${title}', vars, 2, []), ['Original']);
 		assert.equal(vars[0].replaceWith, 'Original');
-		assert.match(adn.generateRandomString(17), /^[0-9a-f]{17}$/);
-		assert.deepEqual(adn.parseCookies('ok=hello%20world; bad=%GG; extra=a=b'), { ok: 'hello world', bad: '%GG', extra: 'a=b' });
-		console.log('✓ filename overrides are isolated, timestamps round correctly, and ADN tolerates malformed cookies');
+		console.log('✓ filename overrides are isolated and timestamps round correctly');
 
 		const execTemp = fs.mkdtempSync(path.join(os.tmpdir(), 'anidl-exec-test-'));
 		try {
@@ -129,9 +104,7 @@ import path from 'node:path';
 			assert.equal(Helper.exec('node', process.execPath, ['-e', script, output, 'array argument']).isOk, true);
 			assert.equal(fs.readFileSync(output, 'utf8'), 'array argument');
 
-			// The background runner keeps the same contract: the event loop is
-			// free while the child works, a failure still reports its exit code,
-			// and an unspawnable binary resolves instead of throwing.
+			// same contract as exec(), without blocking the event loop
 			assert.equal((await Helper.execAsync('node', process.execPath, ['-e', script, output, 'async argument'])).isOk, true);
 			assert.equal(fs.readFileSync(output, 'utf8'), 'async argument');
 			const asyncFail = await Helper.execAsync('node', process.execPath, ['-e', 'process.exit(3)']);

@@ -36,7 +36,7 @@ export type TAppArg<T extends boolean | string | number | unknown[], K = any> = 
 				default: T | undefined;
 				name?: string;
 		  };
-	service: Array<'crunchy' | 'hidive' | 'adn' | 'all'>;
+	service: Array<'crunchy' | 'all'>;
 	usage: string; // -(-)${name} will be added for each command,
 	demandOption?: true;
 	transformer?: (value: T) => K;
@@ -56,7 +56,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 'url',
 		alias: 'u',
 		describe: 'Set the URL to download from (automatically selects service and target ID)',
-		docDescribe: 'Provide a series, season, or episode URL from Crunchyroll, HiDive, or ADN.' + '\nThe service and target IDs are automatically resolved.',
+		docDescribe: 'Provide a series, season, or episode URL from Crunchyroll.' + '\nThe service and target IDs are automatically resolved.',
 		group: 'dl',
 		service: ['all'],
 		type: 'string',
@@ -112,7 +112,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		describe: 'Set the page number for search results',
 		docDescribe: 'The output is organized in pages. Use this command to output the items for the given page',
 		group: 'search',
-		service: ['crunchy', 'hidive'],
+		service: ['crunchy'],
 		type: 'number',
 		usage: '${page}'
 	},
@@ -126,7 +126,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 			default: 'en-US'
 		},
 		type: 'string',
-		service: ['crunchy', 'adn'],
+		service: ['crunchy'],
 		usage: '${locale}'
 	},
 	{
@@ -134,7 +134,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 'new',
 		describe: 'Get last updated series list',
 		docDescribe: true,
-		service: ['crunchy', 'hidive'],
+		service: ['crunchy'],
 		type: 'boolean',
 		usage: ''
 	},
@@ -291,22 +291,8 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		describe: 'Will fetch the chapters and add them into the final video',
 		type: 'boolean',
 		group: 'dl',
-		service: ['crunchy', 'adn'],
+		service: ['crunchy'],
 		docDescribe: 'Will fetch the chapters and add them into the final video.',
-		usage: '',
-		default: {
-			default: true
-		}
-	},
-	{
-		name: 'removeBumpers',
-		describe: 'Remove bumpers from final video',
-		type: 'boolean',
-		group: 'dl',
-		service: ['hidive'],
-		docDescribe:
-			'If selected, it will remove the bumpers such as the hidive intro from the final file.' +
-			'\nCurrently disabling this sometimes results in bugs such as video/audio desync',
 		usage: '',
 		default: {
 			default: true
@@ -317,7 +303,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		describe: 'Keep original font size',
 		type: 'boolean',
 		group: 'dl',
-		service: ['hidive'],
+		service: ['crunchy'],
 		docDescribe: 'If selected, it will prefer to keep the original Font Size defined by the service.',
 		usage: '',
 		default: {
@@ -463,7 +449,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		group: 'dl',
 		describe: 'Disables VTT conversion to ASS.',
 		docDescribe: true,
-		service: ['crunchy', 'hidive'],
+		service: ['crunchy'],
 		type: 'boolean',
 		usage: '',
 		default: {
@@ -583,7 +569,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		group: 'dl',
 		describe: 'Skip downloading audio',
 		docDescribe: true,
-		service: ['crunchy', 'hidive'],
+		service: ['crunchy'],
 		type: 'boolean',
 		usage: ''
 	},
@@ -639,15 +625,6 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		usage: '${fontSize}'
 	},
 	{
-		name: 'combineLines',
-		describe: 'Merge adjacent lines with same style and text',
-		docDescribe: 'If selected, will prevent a line from shifting downwards',
-		group: 'dl',
-		service: ['hidive'],
-		type: 'boolean',
-		usage: ''
-	},
-	{
 		name: 'allDubs',
 		describe: 'If selected, all available dubs will get downloaded',
 		docDescribe: true,
@@ -674,22 +651,10 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		type: 'number',
 		describe: 'Set the time the program waits between downloads. Set in millisecods',
 		docDescribe: true,
-		service: ['crunchy', 'hidive'],
+		service: ['crunchy'],
 		usage: '${waittime}',
 		default: {
 			default: 0 * 1000
-		}
-	},
-	{
-		name: 'simul',
-		group: 'dl',
-		describe: 'Force downloading simulcast version instead of uncut version (if available).',
-		docDescribe: true,
-		service: ['hidive'],
-		type: 'boolean',
-		usage: '',
-		default: {
-			default: false
 		}
 	},
 	{
@@ -709,7 +674,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		group: 'mux',
 		describe: 'Keeps all videos when merging instead of discarding extras',
 		docDescribe: 'If set to true, it will keep all videos in the merge process, rather than discarding the extra videos.',
-		service: ['crunchy', 'hidive'],
+		service: ['crunchy'],
 		type: 'boolean',
 		usage: '',
 		default: {
@@ -724,7 +689,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 			'If enabled attempts to sync timing for multi-dub downloads.' +
 			'\nNOTE: This is currently experimental and syncs audio and subtitles, though subtitles has a lot of guesswork' +
 			'\nIf you find bugs with this, please report it in the discord or github',
-		service: ['crunchy', 'hidive'],
+		service: ['crunchy'],
 		type: 'boolean',
 		usage: '',
 		default: {
@@ -837,7 +802,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		group: 'util',
 		service: ['all'],
 		type: 'string',
-		choices: ['crunchy', 'hidive', 'adn'],
+		choices: ['crunchy'],
 		usage: '${service}',
 		default: {
 			default: ''
@@ -858,7 +823,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		group: 'fonts',
 		describe: 'Set the font to use in subtiles',
 		docDescribe: true,
-		service: ['hidive', 'adn'],
+		service: ['crunchy'],
 		type: 'string',
 		usage: '${fontName}'
 	},

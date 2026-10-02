@@ -48,9 +48,6 @@ body:
           description: 'Please tell us what service the bug occured in.'
           options:
               - Crunchyroll
-              - Hidive
-              - AnimationDigitalNetwork
-              - All
               - Irrelevant
       validations:
           required: true

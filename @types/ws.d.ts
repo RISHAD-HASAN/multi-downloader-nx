@@ -30,8 +30,8 @@ export type MessageTypes = {
 	isDownloading: [undefined, boolean];
 	openFolder: [FolderTypes, undefined];
 	changeProvider: [undefined, boolean];
-	type: [undefined, 'crunchy' | 'hidive' | 'adn' | undefined];
-	setup: ['crunchy' | 'hidive' | 'adn' | undefined, undefined];
+	type: [undefined, 'crunchy' | undefined];
+	setup: ['crunchy' | undefined, undefined];
 	openFile: [[FolderTypes, string], undefined];
 	openURL: [string, undefined];
 	isSetup: [undefined, boolean];

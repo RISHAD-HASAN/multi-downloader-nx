@@ -151,18 +151,6 @@ const DownloadSelector: React.FC<DownloadSelectorProps> = ({ onFinish }) => {
 						>
 							Skip Unnecessary
 						</Button>
-						<Tooltip title={store.service == 'hidive' ? '' : <Typography>Simulcast is only supported on Hidive</Typography>} arrow placement="top">
-							<Box>
-								<Button
-									sx={{ textTransform: 'none' }}
-									disabled={store.service != 'hidive'}
-									onClick={() => dispatch({ type: 'downloadOptions', payload: { ...store.downloadOptions, simul: !store.downloadOptions.simul } })}
-									variant={store.downloadOptions.simul ? 'contained' : 'outlined'}
-								>
-									Download Simulcast ver.
-								</Button>
-							</Box>
-						</Tooltip>
 					</Box>
 					<Box
 						sx={{

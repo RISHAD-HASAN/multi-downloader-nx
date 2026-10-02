@@ -72,9 +72,8 @@ Adapted, not merged: the Rich console, key vaults, pnpm build and tests stay.
   `BIN_DIR`/`PATH/bin`. Upstream's global TLS-verification bypass was **not**
   adopted.
 - Safe, non-GUI fixes from `4ae07eb`: filename overrides no longer mutate
-  variables across episodes, ADN uses secure random bytes and keeps malformed
-  cookie values, time formatting handles rounding, ffmpeg maps the chapter input
-  after subtitles and skips missing files on cleanup. Subprocesses stay shell-free
+  variables across episodes, time formatting handles rounding, ffmpeg maps the
+  chapter input after subtitles and skips missing files on cleanup. Subprocesses stay shell-free
   and quiet, `7z` is invoked without a shell, and the updater uses an absolute
   path. A damaged download archive is backed up instead of being overwritten or
   blocking future downloads.
@@ -82,7 +81,7 @@ Adapted, not merged: the Rich console, key vaults, pnpm build and tests stay.
 Fixes the ports needed:
 
 - erolus77 declared `signSubsForced?: argv.signSubsForced`, which is not valid TS,
-  and quietly dropped the `[Simulcast]`/`[Uncut]` track labels. Both are fixed.
+  and quietly dropped the mkvmerge track labels. Both are fixed.
 - The majin URL rewrite was not idempotent (a second pass produced
   `/static/majin/majin/`) and rewrote HLS URLs into dead links.
 - Majin was latched globally once auto-detection succeeded, so a title with a
@@ -134,18 +133,12 @@ Fixes the ports needed:
   wrong offset; a resume now trims the file back to the marker first, and a part
   only counts as committed once its last byte reached the handle.
 - Decrypting a track used to be a silent gap in the log. Each track now logs its
-  duration (`Decrypted video in 12.3s` in Crunchyroll, `Decryption done for
-  video/audio (12.3s)` in HIDIVE) and each mux logs `[ffmpeg] Muxing took ...`,
-  so download, decrypt and mux can be told apart at a glance.
+  duration (`Decrypted video in 12.3s`) and each mux logs
+  `[ffmpeg] Muxing took ...`, so download, decrypt and mux can be told apart.
 - A finished track is renamed into place (`Helper.moveFile`, copy fallback only
   across volumes) instead of copied and then unlinked; `copyFileSync` wrote every
   decrypted byte a second time (~3.4 s per GiB on the test disk). A failed
   decryption also deletes its half-written output.
-- `hidive.ts` used to run video and audio as one strict sequence - download the
-  video, decrypt it, then download and decrypt every audio track one by one -
-  and decrypted with the blocking `execFileSync`. Video and audio are now two
-  jobs joined with `Promise.all`, and decrypting uses the background runner
-  (`Helper.execAsync`), so audio never waits for the video to finish.
 - `module.merger.ts` muxes with the same background runner and reports how long
   ffmpeg/mkvmerge took, instead of freezing the process while a multi-GB file is
   remuxed.
@@ -154,6 +147,17 @@ Fixes the ports needed:
   question instead of two readline interfaces reading the same stdin. Captured
   subprocess output is capped at the last 512 KB per stream, so a chatty
   `--show-progress` decrypt cannot buffer a whole multi-GB run in memory.
+
+## Crunchyroll only
+
+This fork is used for Crunchyroll, so the HiDive and ADN services are gone:
+`adn.ts`, `hidive.ts`, their GUI handlers and their `@types` declarations are
+removed, along with the URL/API/args/archive/language plumbing, docs and package
+metadata that only existed for them. Modules that no service imported any more
+(cookie-file parsing, the old `vttconvert`, four unused `@types` files) and the
+HiDive-only `--simul`, `--removeBumpers`, `--originalFontSize` and
+`--combineLines` options went with them. Remaining comments were cut back to
+plain one-liners, and commented-out code was deleted.
 
 ## Known limitations
 

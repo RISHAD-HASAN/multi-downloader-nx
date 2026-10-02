@@ -15,7 +15,6 @@ let relGroup = '';
 let fontSize = 0;
 let tmMrg = 0;
 let rFont = 'Trebuchet MS';
-let doCombineLines = false;
 
 type Css = Record<
 	string,
@@ -130,8 +129,6 @@ function parseStyle(stylegroup: string, line: string, style: any) {
 					//don't touch font-weight if dialog
 					break;
 				}
-				// console.info("Changing bold weight");
-				// console.info(stylegroup);
 				if (st[1] === 'bold') {
 					style[6] = -1;
 					break;
@@ -281,34 +278,6 @@ function timestampToCentiseconds(timestamp: string) {
 	return 360000 * hour + 6000 * minute + 100 * second + centisecond;
 }
 
-function combineLines(events: string[]): string[] {
-	if (!doCombineLines) {
-		return events;
-	}
-	// This function is for combining adjacent lines with same information
-	const newLines: string[] = [];
-	for (const currentLine of events) {
-		let hasCombined: boolean = false;
-		// Check previous 7 elements, arbritary lookback amount
-		for (let j = 1; j < 8 && j < newLines.length; j++) {
-			const checkLine = newLines[newLines.length - j];
-			const checkLineSplit = checkLine.split(',');
-			const currentLineSplit = currentLine.split(',');
-			// 1 = start, 2 = end, 3 = style, 9+ = text
-			if (checkLineSplit.slice(9).join(',') == currentLineSplit.slice(9).join(',') && checkLineSplit[3] == currentLineSplit[3] && checkLineSplit[2] == currentLineSplit[1]) {
-				checkLineSplit[2] = currentLineSplit[2];
-				newLines[newLines.length - j] = checkLineSplit.join(',');
-				hasCombined = true;
-				break;
-			}
-		}
-		if (!hasCombined) {
-			newLines.push(currentLine);
-		}
-	}
-	return newLines;
-}
-
 function pushBuffer(buffer: ReturnType<typeof convertLine>[], events: string[]) {
 	buffer.reverse();
 	const bufferStrings: string[] = buffer.map((line) => `Dialogue: 1,${line.start},${line.end},${line.style},,0,0,0,,${line.text}`);
@@ -399,7 +368,6 @@ function convert(css: Css, vtt: Vtt[]) {
 
 	pushBuffer(buffer, events['subtitle']);
 	events['subtitle'].push(...captionsBuffer);
-	events['subtitle'] = combineLines(events['subtitle']);
 
 	if (events.subtitle.length > 0) {
 		ass = ass.concat(
@@ -463,7 +431,6 @@ function convertLine(css: Record<string, string>, l: Record<any, any>) {
 }
 
 function convertText(text: string) {
-	//const m = text.match(/<c\.([^>]*)>([\S\s]*)<\/c>/);
 	const m = text.match(/<(?:c\.|)([^>]*)>([\S\s]*)<\/(?:c|Default)>/);
 	let style = '';
 	if (m) {
@@ -515,20 +482,11 @@ function toSubTime(str: string) {
 	return n.slice(0, 3).join(':') + '.' + n[3];
 }
 
-export default function vtt2ass(
-	group: string | undefined,
-	xFontSize: number | undefined,
-	vttStr: string,
-	cssStr: string,
-	timeMargin?: number,
-	replaceFont?: string,
-	combineLines?: boolean
-) {
+export default function vtt2ass(group: string | undefined, xFontSize: number | undefined, vttStr: string, cssStr: string, timeMargin?: number, replaceFont?: string) {
 	relGroup = group ?? '';
 	fontSize = xFontSize && xFontSize > 0 ? xFontSize : 34; // 1em to pix
 	tmMrg = timeMargin ? timeMargin : 0; //
 	rFont = replaceFont ? replaceFont : rFont;
-	doCombineLines = combineLines ? combineLines : doCombineLines;
 	if (vttStr.match(/::cue(?:.(.+)\) *)?{([^}]+)}/g)) {
 		const cssLines = [];
 		let defaultCss = '';

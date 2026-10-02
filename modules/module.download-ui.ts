@@ -1,6 +1,4 @@
-// The live download view: one session per episode. hls-download reports into it
-// instead of printing a line per chunk, and extra dubs and subtitles are appended
-// to the same tree as they appear. Normal log lines print above the live region.
+// Live download view: one session per episode, fed by hls-download.
 
 import { DownloadTable, console_, type TrackLike } from './module.console';
 import { formatBytes } from './module.rich';

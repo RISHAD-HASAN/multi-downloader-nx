@@ -1,6 +1,4 @@
-// Scene-style filenames: whitespace and punctuation collapse into dots, including
-// the full-width colon (U+FF1A) Windows substitutes for ':'. In-word apostrophes
-// fold into the word instead of becoming dots.
+// Scene-style filenames: punctuation collapses into dots, in-word apostrophes fold.
 import assert from 'node:assert/strict';
 import parseFileName, { type Variable } from '../modules/module.filename';
 

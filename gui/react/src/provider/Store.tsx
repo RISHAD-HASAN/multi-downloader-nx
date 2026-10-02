@@ -14,14 +14,13 @@ export type DownloadOptions = {
 	but: boolean;
 	novids: boolean;
 	hslang?: string;
-	simul: boolean;
 	noaudio: boolean;
 };
 
 export type StoreState = {
 	episodeListing: Episode[];
 	downloadOptions: DownloadOptions;
-	service: 'crunchy' | 'hidive' | 'adn' | undefined;
+	service: 'crunchy' | undefined;
 	version: string;
 };
 
@@ -50,8 +49,7 @@ const initialState: StoreState = {
 		all: false,
 		but: false,
 		noaudio: false,
-		novids: false,
-		simul: false
+		novids: false
 	},
 	service: undefined,
 	episodeListing: [],

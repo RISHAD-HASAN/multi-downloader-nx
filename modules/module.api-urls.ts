@@ -3,10 +3,7 @@ const domain = {
 	cr_www: 'https://www.crunchyroll.com',
 	cr_api: 'https://beta-api.crunchyroll.com',
 	cr_playback: 'https://cr-play-service.prd.crunchyrollsvc.com',
-	cr_license: 'https://cr-license-proxy.prd.crunchyrollsvc.com',
-	hd_www: 'https://www.hidive.com',
-	hd_api: 'https://api.hidive.com',
-	hd_new: 'https://dce-frontoffice.imggaming.com'
+	cr_license: 'https://cr-license-proxy.prd.crunchyrollsvc.com'
 };
 
 export type APIType = {
@@ -31,16 +28,6 @@ export type APIType = {
 	crunchyDefHeader: Record<string, any>;
 	crunchyAuthHeader: Record<string, string>;
 	crunchyAuthRefreshHeader: Record<string, string>;
-	// Hidive
-	hd_apikey: string;
-	hd_devName: string;
-	hd_appId: string;
-	hd_clientWeb: string;
-	hd_clientExo: string;
-	hd_api: string;
-	hd_new_api: string;
-	hd_new_apiKey: string;
-	hd_new_version: string;
 };
 
 const api: APIType = {
@@ -69,21 +56,9 @@ const api: APIType = {
 	crunchyDefUserAgent: 'Crunchyroll/ANDROIDTV/3.70.0_22358 (Android 12; en-US; SHIELD Android TV Build/SR1A.220624.014)',
 	crunchyDefHeader: {},
 	crunchyAuthHeader: {},
-	crunchyAuthRefreshHeader: {},
+	crunchyAuthRefreshHeader: {}
 	//
 	//
-	// Hidive
-	// Hidive API
-	hd_apikey: '508efd7b42d546e19cc24f4d0b414e57e351ca73',
-	hd_devName: 'Android',
-	hd_appId: '24i-Android',
-	hd_clientWeb: 'okhttp/3.4.1',
-	hd_clientExo: 'smartexoplayer/1.6.0.R (Linux;Android 6.0) ExoPlayerLib/2.6.0',
-	hd_api: `${domain.hd_api}/api/v1`,
-	// Hidive New API
-	hd_new_api: `${domain.hd_new}/api`,
-	hd_new_apiKey: '857a1e5d-e35e-4fdf-805b-a87b6f8364bf',
-	hd_new_version: '6.0.1.bbf09a2'
 };
 
 api.crunchyDefHeader = {

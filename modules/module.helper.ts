@@ -35,9 +35,8 @@ export default class Helper {
 	}
 
 	/**
-	 * Same contract as exec(), but the child runs in the background: the event
-	 * loop keeps serving downloads and repainting the UI while ffmpeg/mkvmerge/
-	 * mp4decrypt work on a multi-GB file.
+	 * Same contract as exec(), but the child runs in the background so the event
+	 * loop keeps serving downloads while it works.
 	 */
 	static execAsync(pname: string, fpath: string, pargs: string | string[], spc = false): Promise<ExecResult> {
 		const quiet = quietDefault();
@@ -51,8 +50,7 @@ export default class Helper {
 			let stdout = '';
 			let stderr = '';
 			if (quiet) {
-				// A --show-progress decrypt can talk for the length of a multi-GB
-				// file: keep the tail only, a failure report does not need more.
+				// keep the tail only: a chatty decrypt must not buffer a whole run
 				const capture = (current: string, data: Buffer) => (current + data).slice(-Helper.maxCapturedOutput);
 				child.stdout?.on('data', (data) => (stdout = capture(stdout, data.toString())));
 				child.stderr?.on('data', (data) => (stderr = capture(stderr, data.toString())));
@@ -76,8 +74,7 @@ export default class Helper {
 	}
 
 	/**
-	 * Move a finished file into place. A rename is instant on the same volume;
-	 * only a cross-device move falls back to copying the bytes again.
+	 * Rename a finished file into place, copying only across volumes.
 	 */
 	static moveFile(from: string, to: string): void {
 		try {
@@ -90,9 +87,8 @@ export default class Helper {
 	}
 
 	/**
-	 * Prompts are queued: two tracks transferring at once can both find an
-	 * existing file, and two live readline interfaces would fight over the same
-	 * stdin answer. They take turns instead.
+	 * Prompts take turns: two tracks can find an existing file at the same time,
+	 * and two readline interfaces would fight over stdin.
 	 */
 	static question(q: string): Promise<string> {
 		const ask = Helper.promptQueue.then(async () => {

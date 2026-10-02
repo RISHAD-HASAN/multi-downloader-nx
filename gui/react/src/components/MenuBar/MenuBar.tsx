@@ -21,16 +21,7 @@ const MenuBar: React.FC = () => {
 		})();
 	}, [messageChannel]);
 
-	const transformService = (service: StoreState['service']) => {
-		switch (service) {
-			case 'crunchy':
-				return 'Crunchyroll';
-			case 'hidive':
-				return 'Hidive';
-			case 'adn':
-				return 'AnimationDigitalNetwork';
-		}
-	};
+	const transformService = (service: StoreState['service']) => (service === 'crunchy' ? 'Crunchyroll' : undefined);
 
 	const msg = React.useContext(messageChannelContext);
 

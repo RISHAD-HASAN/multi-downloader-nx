@@ -1,8 +1,7 @@
-// Maps a pasted Crunchyroll / HiDive / ADN URL onto a service, a target type and
-// the ID the CLI flags expect.
+// Maps a pasted Crunchyroll URL onto a target type and the ID the CLI flags expect.
 
 export type ParsedUrl = {
-	service: 'crunchy' | 'hidive' | 'adn';
+	service: 'crunchy';
 	type: 'series' | 'season' | 'episode' | 'movieListing' | 'extid';
 	id: string;
 	originalUrl: string;
@@ -77,71 +76,6 @@ export function parseUrl(rawUrl: string): ParsedUrl | undefined {
 				service: 'crunchy',
 				type: 'extid',
 				id: legacyMatch[1],
-				originalUrl: rawUrl
-			};
-		}
-
-		return undefined;
-	}
-
-	if (hostname === 'hidive.com' || hostname.endsWith('.hidive.com')) {
-		const seasonMatch = pathname.match(/^\/(?:season|movies?)\/(\d+)/i);
-		if (seasonMatch) {
-			return {
-				service: 'hidive',
-				type: 'season',
-				id: seasonMatch[1],
-				originalUrl: rawUrl
-			};
-		}
-
-		const seriesMatch = pathname.match(/^\/(?:series|tv)\/(\d+)/i);
-		if (seriesMatch) {
-			return {
-				service: 'hidive',
-				type: 'series',
-				id: seriesMatch[1],
-				originalUrl: rawUrl
-			};
-		}
-
-		const epMatch = pathname.match(/^\/(?:episode|(?:stream|watch)\/[^/]+|(?:stream|watch))\/(\d+)/i);
-		if (epMatch) {
-			return {
-				service: 'hidive',
-				type: 'episode',
-				id: epMatch[1],
-				originalUrl: rawUrl
-			};
-		}
-
-		return undefined;
-	}
-
-	if (
-		hostname === 'animationdigitalnetwork.fr' ||
-		hostname.endsWith('.animationdigitalnetwork.fr') ||
-		hostname === 'animationdigitalnetwork.com' ||
-		hostname.endsWith('.animationdigitalnetwork.com') ||
-		hostname === 'adn.fr' ||
-		hostname.endsWith('.adn.fr')
-	) {
-		const showMatch = pathname.match(/^\/(?:video\/)?show\/(\d+)/i);
-		if (showMatch) {
-			return {
-				service: 'adn',
-				type: 'season',
-				id: showMatch[1],
-				originalUrl: rawUrl
-			};
-		}
-
-		const videoMatch = pathname.match(/^\/video\/(\d+)(?:-[a-zA-Z0-9-]+)?/i);
-		if (videoMatch) {
-			return {
-				service: 'adn',
-				type: 'season',
-				id: videoMatch[1],
 				originalUrl: rawUrl
 			};
 		}
