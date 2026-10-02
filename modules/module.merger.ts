@@ -467,7 +467,10 @@ class Merger {
 			return;
 		}
 		console.debug(`[${type}] Started merging`);
-		const res = Helper.exec(type, `"${bin}"`, command);
+		// Awaited but non-blocking: muxing a multi-GB file must not freeze the
+		// event loop (and with it the live view) while it runs.
+		const mergeStarted = Date.now();
+		const res = await Helper.execAsync(type, `"${bin}"`, command);
 		if (!res.isOk && type === 'mkvmerge' && res.err.code === 1) {
 			console.warn(`[${type}] finished with at least one warning`);
 		} else if (!res.isOk) {
@@ -479,6 +482,7 @@ class Merger {
 		}
 		// The one line that matters
 		console.print(new Padding(`[green]${this.options.output}[/] [text2]done[/]`, [1, 0, 1, 5]));
+		console.debug(`[${type}] Muxing took ${Helper.formatTime((Date.now() - mergeStarted) / 1000)}`);
 	}
 
 	public cleanUp() {

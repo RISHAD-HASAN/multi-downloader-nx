@@ -41,6 +41,20 @@ import path from 'node:path';
 		assert.ok(crunchySource.includes('if (!options.listFormats && !options.F && !this.cfg.bin.mp4decrypt'), 'format listing should work without a decryptor');
 		console.log('✓ format listing skips mux/archive in Crunchyroll and ADN, and bypasses CDM checks');
 
+		// Transfer/decrypt wiring: audio must not queue behind the whole video,
+		// decryption must not block the event loop, and a finished track must be
+		// renamed into place instead of being copied a second time.
+		const hidiveSource = fs.readFileSync(path.join(__dirname, '..', 'hidive.ts'), 'utf8');
+		const mergerSource = fs.readFileSync(path.join(__dirname, '..', 'modules', 'module.merger.ts'), 'utf8');
+		assert.ok(hidiveSource.includes('const videoJob = (async () => {'), 'HIDIVE video transfer must run as its own job');
+		assert.ok(hidiveSource.includes('await Promise.all([videoJob, audioJob]);'), 'HIDIVE audio must transfer while the video is still running');
+		assert.ok(!hidiveSource.includes('const decryptVideo = Helper.exec('), 'HIDIVE decryption must not block the event loop');
+		assert.ok(hidiveSource.includes('await Helper.execAsync('), 'HIDIVE must use the background subprocess runner');
+		assert.ok(hidiveSource.includes('Helper.moveFile('), 'HIDIVE must rename finished tracks instead of copying them');
+		assert.ok(crunchySource.includes('Helper.moveFile(output, destination);'), 'Crunchyroll must rename decrypted tracks instead of copying them');
+		assert.ok(mergerSource.includes('await Helper.execAsync(type'), 'muxing must not block the event loop');
+		console.log('✓ transfers run concurrently and finished tracks are renamed, not copied');
+
 		const cms = { bucket: '/test', policy: 'test', signature: 'test', key_pair_id: 'test' };
 		const json = (value: unknown) => ({ ok: true, res: new Response(JSON.stringify(value)) });
 		const failed = { ok: false, res: new Response(null, { status: 403 }) };

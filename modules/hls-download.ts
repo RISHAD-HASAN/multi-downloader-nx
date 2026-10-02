@@ -80,10 +80,10 @@ type Data = {
 
 // hls class
 class hlsDownload {
-	// Parts finished in this run, used to drive the live progress bar
-	private uiDone = 0;
 	// Most recent part error, used to derive an actionable network hint
 	private lastError: unknown;
+	// In-flight key downloads, keyed by key URI (see fetchKey)
+	private keyPromises = new Map<string, Promise<Buffer>>();
 	private data: Data;
 	constructor(options: HLSOptions) {
 		// check playlist
@@ -133,6 +133,15 @@ class hlsDownload {
 						console.debug('Resume data is ok!');
 						this.data.offset = resumeData.completed;
 						this.data.isResume = true;
+						// A crash can leave bytes on disk that the marker does not
+						// vouch for; cut them so the parts that follow stay aligned.
+						if (typeof resumeData.bytes == 'number' && resumeData.bytes >= 0) {
+							const size = (await fs.stat(fn)).size;
+							if (size != resumeData.bytes) {
+								await fs.truncate(fn, resumeData.bytes);
+								console.debug(`Trimmed ${size - resumeData.bytes} byte(s) written after the last resume marker`);
+							}
+						}
 					} else {
 						console.warn(' Resume data is wrong!');
 						console.warn({
@@ -175,6 +184,9 @@ class hlsDownload {
 		}
 		// start time
 		this.data.dateStart = Date.now();
+		// Bytes already on disk (resumed prefix) and bytes covered by complete parts
+		let startBytes = this.data.isResume ? (await fs.stat(fn)).size : 0;
+		let committedBytes = startBytes;
 		let segments = this.data.m3u8json.segments;
 		// download init part
 		if (segments?.[0].map && this.data.offset === 0 && !this.data.skipInit) {
@@ -184,13 +196,16 @@ class hlsDownload {
 				initSeg.key = segments[0].key as Key;
 			}
 			try {
-				const initDl = await this.downloadPart(initSeg, 0, 0);
+				const initDl = await this.downloadPart(initSeg, 0);
 				await fs.writeFile(fn, initDl.dec, { flag: 'a' });
+				startBytes = (await fs.stat(fn)).size;
+				committedBytes = startBytes;
 				await fs.writeFile(
 					`${fn}.resume`,
 					JSON.stringify({
 						completed: 0,
-						total: this.data.m3u8json.segments?.length
+						total: this.data.m3u8json.segments?.length,
+						bytes: committedBytes
 					})
 				);
 				console.debug('Init part downloaded.');
@@ -207,116 +222,59 @@ class hlsDownload {
 			console.debug(`Resuming download from part ${this.data.offset + 1}...`);
 			this.data.parts.completed = this.data.offset;
 		}
-		// dl process
-		for (let p = 0; p < (segments?.length ?? 0) / this.data.threads; p++) {
-			// set offsets
-			const offset = p * this.data.threads;
-			const dlOffset = offset + this.data.threads;
-			// map download threads
-			const krq = new Map(),
-				prq = new Map();
-			const res: any[] = [];
-			let errcnt = 0;
-			for (let px = offset; px < dlOffset && px < (segments?.length ?? 0); px++) {
-				const curp = segments?.[px];
-				const key = curp?.key as Key;
-				if (key && !krq.has(key.uri) && !this.data.keys[key.uri as string]) {
-					krq.set(key.uri, this.downloadKey(key, px, this.data.offset));
-				}
-			}
-			try {
-				await Promise.all(krq.values());
-			} catch (er: any) {
-				console.error(`Key ${er.p + 1} download error:\n\t${er.message}`);
-				return { ok: false, parts: this.data.parts };
-			}
-			for (let px = offset; px < dlOffset && px < (segments?.length ?? 0); px++) {
-				const curp = segments?.[px] as Segment;
-				prq.set(px, () => this.downloadPart(curp, px, this.data.offset));
-			}
-			// Parallelized part download with retry logic and optional concurrency limit
-			const maxConcurrency = this.data.threads;
-			const partEntries = [...prq.entries()];
-			let index = 0;
+		// dl process: a fixed worker pool drains the whole playlist and a single
+		// ordered writer appends parts as soon as the gap in front of them is
+		// filled, so a straggler never idles the other connections and disk
+		// writes overlap the transfers instead of pausing them.
+		const totalSeg = (segments?.length ?? 0) + this.data.offset; // Add the sliced length back so the resume data will be correct even if a resumed download fails
+		let nextToWrite = this.data.offset;
+		let nextIndex = 0;
+		let errcnt = 0;
+		let writeFailed = false;
+		let lastReported = this.data.offset;
+		const pendingParts = new Map<number, Buffer>();
+		const handle = await fs.open(fn, 'a');
+		// Raw bytes written to disk (used to continue after a short write)
+		let writtenBytes = committedBytes;
 
-			async function worker(this: hlsDownload) {
-				while (index < partEntries.length) {
-					const i = index++;
-					const [px, downloadFn] = partEntries[i];
-
-					let retriesLeft = this.data.retries;
-					let success = false;
-					while (retriesLeft > 0 && !success) {
-						try {
-							const r = await downloadFn();
-							res[px - offset] = r.dec;
-							success = true;
-							// feed the live download view one tick per part, not per chunk
-							this.uiDone++;
-							if (this.data.trackKey) {
-								trackProgress(this.data.trackKey, {
-									completed: this.data.offset + this.uiDone,
-									bytes: this.data.bytesDownloaded
-								});
-							}
-						} catch (error: any) {
-							this.lastError = error;
-							retriesLeft--;
-							console.warn(`Retrying part ${error.p + 1 + this.data.offset} (${this.data.retries - retriesLeft}/${this.data.retries})`);
-							if (retriesLeft > 0) {
-								await new Promise((resolve) => setTimeout(resolve, 1000));
-							} else {
-								console.error(`Part ${error.p + 1 + this.data.offset} download failed after ${this.data.retries} retries: ${describeError(error)}`);
-								errcnt++;
-							}
-						}
+		const writePart = async (buf: Buffer): Promise<boolean> => {
+			let attempt = 0;
+			let written = 0;
+			while (attempt < 3) {
+				try {
+					while (written < buf.byteLength) {
+						const { bytesWritten } = await handle.write(buf, written, buf.byteLength - written);
+						if (bytesWritten < 1) throw new Error('short write');
+						written += bytesWritten;
+						writtenBytes += bytesWritten;
 					}
+					// The part is complete only now: the marker must never claim
+					// bytes that a failed write left half-finished.
+					committedBytes = writtenBytes;
+					return true;
+				} catch (err) {
+					console.error(err);
+					console.error(`Unable to write to file '${fn}' (Attempt ${attempt + 1}/3)`);
+					console.info(`Waiting ${Math.round(this.data.waitTime / 1000)}s before retrying`);
+					await new Promise<void>((resolve) => setTimeout(() => resolve(), this.data.waitTime));
 				}
+				attempt++;
 			}
+			console.error(`Unable to write content to '${fn}'.`);
+			return false;
+		};
 
-			const workers = [];
-			for (let i = 0; i < maxConcurrency; i++) {
-				workers.push(worker.call(this));
-			}
-			await Promise.all(workers);
-
-			// catch error
-			if (errcnt > 0) {
-				console.error(`${errcnt} parts not downloaded`);
-				const hint = this.lastError ? networkHint(this.lastError) : undefined;
-				if (hint) console.error(hint);
-				return { ok: false, parts: this.data.parts };
-			}
-			// write downloaded
-			for (const r of res) {
-				let error = 0;
-				while (error < 3) {
-					try {
-						await fs.writeFile(fn, r, { flag: 'a' });
-						break;
-					} catch (err) {
-						console.error(err);
-						console.error(`Unable to write to file '${fn}' (Attempt ${error + 1}/3)`);
-						console.info(`Waiting ${Math.round(this.data.waitTime / 1000)}s before retrying`);
-						await new Promise<void>((resolve) => setTimeout(() => resolve(), this.data.waitTime));
-					}
-					error++;
-				}
-				if (error === 3) {
-					console.error(`Unable to write content to '${fn}'.`);
-					return { ok: false, parts: this.data.parts };
-				}
-			}
-			// log downloaded
-			const totalSeg = (segments?.length ?? 0) + this.data.offset; // Add the sliced lenght back so the resume data will be correct even if an resumed download fails
-			const downloadedSeg = dlOffset < totalSeg ? dlOffset : totalSeg;
-			this.data.parts.completed = downloadedSeg + this.data.offset;
-			const data = extFn.getDownloadInfo(this.data.dateStart, downloadedSeg, totalSeg, this.data.bytesDownloaded);
+		const reportProgress = async (force = false) => {
+			if (!force && nextToWrite - lastReported < this.data.threads) return;
+			lastReported = nextToWrite;
+			this.data.parts.completed = nextToWrite;
+			const data = extFn.getDownloadInfo(this.data.dateStart, nextToWrite, totalSeg, this.data.bytesDownloaded);
 			await fs.writeFile(
 				`${fn}.resume`,
 				JSON.stringify({
-					completed: this.data.parts.completed,
-					total: totalSeg
+					completed: nextToWrite,
+					total: totalSeg,
+					bytes: committedBytes
 				})
 			);
 			function formatDLSpeedB(s: number) {
@@ -332,36 +290,103 @@ class hlsDownload {
 			if (sessionOwns(this.data.trackKey)) {
 				// the live view renders progress; keep stdout free of per-chunk lines
 				trackProgress(this.data.trackKey as string, {
-					completed: downloadedSeg + this.data.offset,
+					completed: nextToWrite,
 					total: totalSeg,
 					bytes: this.data.bytesDownloaded
 				});
 			} else {
 				console.info(
-					`${downloadedSeg} of ${totalSeg} parts downloaded [${data.percent}%] (${Helper.formatTime(parseInt((data.time / 1000).toFixed(0)))} | ${formatDLSpeedB(data.downloadSpeed)} / ${formatDLSpeedBit(data.downloadSpeed)})`
+					`${nextToWrite} of ${totalSeg} parts downloaded [${data.percent}%] (${Helper.formatTime(parseInt((data.time / 1000).toFixed(0)))} | ${formatDLSpeedB(data.downloadSpeed)} / ${formatDLSpeedBit(data.downloadSpeed)})`
 				);
 			}
 			if (this.data.callback)
 				this.data.callback({
 					total: this.data.parts.total,
-					cur: this.data.parts.completed,
+					cur: nextToWrite,
 					bytes: this.data.bytesDownloaded,
 					percent: data.percent,
 					time: data.time,
 					downloadSpeed: data.downloadSpeed
 				});
+		};
+
+		// Append every part whose turn has come; progress follows what is on disk.
+		const flushParts = async (): Promise<boolean> => {
+			while (pendingParts.has(nextToWrite)) {
+				const buf = pendingParts.get(nextToWrite) as Buffer;
+				pendingParts.delete(nextToWrite);
+				if (!(await writePart(buf))) return false;
+				nextToWrite++;
+				if (this.data.trackKey) {
+					// feed the live download view one tick per part, not per chunk
+					trackProgress(this.data.trackKey, { completed: nextToWrite, bytes: this.data.bytesDownloaded });
+				}
+				await reportProgress();
+			}
+			return true;
+		};
+
+		const worker = async () => {
+			while (errcnt === 0 && !writeFailed) {
+				const i = nextIndex++;
+				if (i >= (segments?.length ?? 0)) return;
+				const curp = segments?.[i] as Segment;
+				const partIndex = i + this.data.offset;
+				let retriesLeft = this.data.retries;
+				while (retriesLeft > 0) {
+					try {
+						const r = await this.downloadPart(curp, partIndex);
+						pendingParts.set(partIndex, r.dec);
+						if (!(await flushParts())) {
+							writeFailed = true;
+							return;
+						}
+						break;
+					} catch (error: any) {
+						this.lastError = error;
+						retriesLeft--;
+						console.warn(`Retrying part ${error.p + 1} (${this.data.retries - retriesLeft}/${this.data.retries})`);
+						if (retriesLeft > 0) {
+							await new Promise((resolve) => setTimeout(resolve, 1000));
+						} else {
+							console.error(`Part ${error.p + 1} download failed after ${this.data.retries} retries: ${describeError(error)}`);
+							errcnt++;
+						}
+					}
+				}
+			}
+		};
+
+		// Parallelized part download with retry logic and optional concurrency limit
+		const workers: Promise<void>[] = [];
+		for (let i = 0; i < Math.max(1, this.data.threads); i++) {
+			workers.push(worker());
 		}
+		await Promise.all(workers);
+		await handle.close();
+
+		// catch error: the file is a contiguous prefix, so a resume marker that
+		// names exactly that prefix makes the next run pick up where this one died
+		if (errcnt > 0 || writeFailed) {
+			await reportProgress(true);
+			if (errcnt > 0) console.error(`${errcnt} parts not downloaded`);
+			const hint = this.lastError ? networkHint(this.lastError) : undefined;
+			if (hint) console.error(hint);
+			return { ok: false, parts: this.data.parts };
+		}
+		// final progress + resume marker, then the marker goes away with the finished file
+		await reportProgress(true);
 		// return result
 		await fs.unlink(`${fn}.resume`);
 		return { ok: true, parts: this.data.parts };
 	}
-	async downloadPart(seg: Segment, segIndex: number, segOffset: number) {
+	async downloadPart(seg: Segment, partIndex: number) {
 		const sURI = extFn.getURI(seg.uri, this.data.baseurl);
 		let decipher, part, dec;
-		const p = segIndex;
+		const p = partIndex;
 		try {
 			if (seg.key != undefined) {
-				decipher = await this.getKey(seg.key, p, segOffset);
+				decipher = await this.getKey(seg.key, p);
 			}
 			part = await extFn.getData(
 				p,
@@ -373,7 +398,7 @@ class hlsDownload {
 							}
 						: {})
 				},
-				segOffset,
+				0,
 				false
 			);
 			if (!part) throw new Error('no response body (see the warning above for the transport error)');
@@ -394,38 +419,53 @@ class hlsDownload {
 		}
 		return { dec, p };
 	}
-	async downloadKey(key: Key, segIndex: number, segOffset: number) {
-		const kURI = extFn.getURI(key.uri, this.data.baseurl);
-		if (!this.data.keys[kURI]) {
-			try {
-				const rkey = await extFn.getData(segIndex, kURI, {}, segOffset, true);
-				return rkey;
-			} catch (error: any) {
-				error.p = segIndex;
+	// One fetch per key URI: every part pointing at the same key shares the
+	// in-flight download instead of hitting the key server once per part.
+	private fetchKey(kURI: string, partIndex: number): Promise<Buffer> {
+		const cached = this.data.keys[kURI];
+		if (cached) return Promise.resolve(Buffer.from(cached));
+		const inflight = this.keyPromises.get(kURI);
+		if (inflight) return inflight;
+		const promise = (async () => {
+			const rkey = await extFn.getData(partIndex, kURI, {}, 0, true);
+			if (!rkey) throw new Error('no response body (see the warning above for the transport error)');
+			return Buffer.from(rkey);
+		})();
+		this.keyPromises.set(kURI, promise);
+		return promise.then(
+			(key) => {
+				this.data.keys[kURI] = key;
+				this.keyPromises.delete(kURI);
+				return key;
+			},
+			(error) => {
+				// Let the next part retry the key instead of poisoning the playlist
+				this.keyPromises.delete(kURI);
 				throw error;
 			}
-		}
+		);
 	}
-	async getKey(key: Key, segIndex: number, segOffset: number) {
+	async getKey(key: Key, partIndex: number) {
 		const kURI = extFn.getURI(key.uri, this.data.baseurl);
-		const p = segIndex;
-		if (!this.data.keys[kURI]) {
+		const p = partIndex;
+		let keyData: Buffer | undefined = this.data.keys[kURI] ? Buffer.from(this.data.keys[kURI]) : undefined;
+		if (!keyData) {
 			try {
-				const rkey = await this.downloadKey(key, segIndex, segOffset);
-				if (!rkey) throw new Error();
-				this.data.keys[kURI] = Buffer.from(rkey);
+				keyData = await this.fetchKey(kURI, partIndex);
 			} catch (error: any) {
 				error.p = p;
 				throw error;
 			}
 		}
-		// get ivs
+		// get ivs: without an explicit IV the HLS spec uses the media sequence
+		// number of the part, so the index must be absolute (resume included)
 		const iv = Buffer.alloc(16);
 		const ivs = key.iv ? key.iv : [0, 0, 0, p + 1];
 		for (let i = 0; i < ivs.length; i++) {
 			iv.writeUInt32BE(ivs[i], i * 4);
 		}
-		return crypto.createDecipheriv('aes-128-cbc', this.data.keys[kURI], iv);
+		if (!keyData) throw new Error('Missing decryption key');
+		return crypto.createDecipheriv('aes-128-cbc', keyData, iv);
 	}
 }
 

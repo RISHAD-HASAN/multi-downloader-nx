@@ -1,4 +1,5 @@
 // Helper functions
+import fs from 'fs';
 import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
 import childProcess from 'child_process';
@@ -8,6 +9,15 @@ import { console } from './log';
 // Subprocess output is hidden unless the user asked for --debug
 const quietDefault = () => richConsole.level !== 'debug' && process.env.isGUI !== 'true';
 
+export type ExecResult =
+	| {
+			isOk: true;
+	  }
+	| {
+			isOk: false;
+			err: Error & { code: number };
+	  };
+
 export default class Helper {
 	/** Non-blocking DRM subprocess. Never log arguments or child output containing keys. */
 	static decrypt(binary: string, args: string[]): Promise<void> {
@@ -16,6 +26,58 @@ export default class Helper {
 			child.once('error', () => reject(new Error('Unable to start decryption executable')));
 			child.once('close', (code) => (code === 0 ? resolve() : reject(new Error(`Decryption failed with exit code ${code}`))));
 		});
+	}
+
+	/**
+	 * Same contract as exec(), but the child runs in the background: the event
+	 * loop keeps serving downloads and repainting the UI while ffmpeg/mkvmerge/
+	 * mp4decrypt work on a multi-GB file.
+	 */
+	static execAsync(pname: string, fpath: string, pargs: string | string[], spc = false): Promise<ExecResult> {
+		const quiet = quietDefault();
+		return new Promise((resolve) => {
+			const argv = Array.isArray(pargs) ? pargs : Helper.splitArguments(pargs);
+			const command = fpath.trim().replace(/^["']|["']$/g, '');
+			const display = argv.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg)).join(' ');
+			if (quiet) console.debug(`> "${pname}" ${display}`);
+			else console.info(`\n> "${pname}" ${display}${spc ? '\n' : ''}`);
+			const child = childProcess.spawn(command, argv, { stdio: quiet ? 'pipe' : 'inherit', windowsHide: true });
+			let stdout = '';
+			let stderr = '';
+			if (quiet) {
+				child.stdout?.on('data', (data) => (stdout += data.toString()));
+				child.stderr?.on('data', (data) => (stderr += data.toString()));
+			}
+			child.once('error', (error) => {
+				resolve({ isOk: false, err: Object.assign(error as Error, { code: 1 }) });
+			});
+			child.once('close', (code) => {
+				if (code === 0) return resolve({ isOk: true });
+				if (quiet) {
+					// The failure output was swallowed - surface it now.
+					const dump = [stdout, stderr].join('\n').trim();
+					if (dump) console.error(dump);
+				}
+				resolve({
+					isOk: false,
+					err: Object.assign(new Error(`${pname} exited with code ${code}`), { code: code ?? 1 })
+				});
+			});
+		});
+	}
+
+	/**
+	 * Move a finished file into place. A rename is instant on the same volume;
+	 * only a cross-device move falls back to copying the bytes again.
+	 */
+	static moveFile(from: string, to: string): void {
+		try {
+			fs.renameSync(from, to);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+			fs.copyFileSync(from, to);
+			fs.unlinkSync(from);
+		}
 	}
 
 	static async question(q: string) {

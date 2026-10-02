@@ -2500,11 +2500,24 @@ export default class Crunchy implements ServiceClass {
 												(keys || []).map((k, i) => `label=KEY${i + 1}:key_id=${k.kid}:key=${k.key}`).join(',')
 											]
 										: [...(keys || []).flatMap((k) => ['--key', `${k.kid}:${k.key}`]), input, output];
-									await Helper.decrypt(binary, args);
-									fs.copyFileSync(output, destination);
-									fs.unlinkSync(output);
+									const decryptStarted = Date.now();
+									try {
+										await Helper.decrypt(binary, args);
+									} catch (error) {
+										// Do not keep a half-decrypted file next to the real output
+										try {
+											fs.rmSync(output, { force: true });
+										} catch {
+											/* the encrypted temp stays for inspection */
+										}
+										throw error;
+									}
+									// A rename puts the finished track in place: copying the
+									// decrypted bytes again would double the disk writes.
+									Helper.moveFile(output, destination);
 									if (!options.nocleanup) fs.unlinkSync(input);
 									trackState(trackKey, 'Decrypted');
+									console.debug(`Decrypted ${kind} in ${Helper.formatTime((Date.now() - decryptStarted) / 1000)}`);
 								}
 								files.push({ type: kind === 'video' ? 'Video' : 'Audio', path: destination, lang, isPrimary });
 							};

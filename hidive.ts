@@ -933,7 +933,18 @@ export default class Hidive implements ServiceClass {
 			);
 		}
 
-		if (!options.novids) {
+		// Video and audio live in separate files, so transfer both at once
+		// instead of making every audio track wait for the whole video.
+		const videoFiles: DownloadedMedia[] = [];
+		const audioFiles: DownloadedMedia[][] = [];
+		let videoJobFailed = false;
+		let audioJobFailed = false;
+
+		const videoJob = (async () => {
+			if (options.novids) {
+				console.info('Skipping Video');
+				return;
+			}
 			//Download Video
 			const totalParts = chosenVideoSegments.segments.length;
 			const mathParts = Math.ceil(totalParts / options.partsize);
@@ -977,7 +988,8 @@ export default class Hidive implements ServiceClass {
 					console.info('Decryption Needed, attempting to decrypt');
 					if (encryptionKeys.length == 0) {
 						console.error('Failed to get encryption keys');
-						return undefined;
+						videoJobFailed = true;
+						return;
 					}
 					if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
 						let commandBase = `--show-progress ${encryptionKeys.map((kb) => `--key ${kb.kid}:${kb.key}`).join(' ')} `;
@@ -989,7 +1001,8 @@ export default class Hidive implements ServiceClass {
 						}
 
 						console.info('Started decrypting video,', this.cfg.bin.shaka ? 'using shaka' : 'using mp4decrypt');
-						const decryptVideo = Helper.exec(
+						const videoDecryptStarted = Date.now();
+						const decryptVideo = await Helper.execAsync(
 							this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt',
 							this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`,
 							commandVideo
@@ -1001,15 +1014,15 @@ export default class Hidive implements ServiceClass {
 								console.error(`Downgrade to Shaka-Packager v2.6.1 (https://github.com/shaka-project/shaka-packager/releases/tag/v2.6.1) and try again`);
 							}
 							fs.renameSync(`${tempTsFile}.video.enc.m4s`, `${tsFile}.video.enc.m4s`);
-							return undefined;
+							videoJobFailed = true;
+							return;
 						} else {
-							console.info('Decryption done for video');
+							console.info(`Decryption done for video (${Helper.formatTime((Date.now() - videoDecryptStarted) / 1000)})`);
 							if (!options.nocleanup) {
 								fs.unlinkSync(`${tempTsFile}.video.enc.m4s`);
 							}
-							fs.copyFileSync(`${tempTsFile}.video.m4s`, `${tsFile}.video.m4s`);
-							fs.unlinkSync(`${tempTsFile}.video.m4s`);
-							files.push({
+							Helper.moveFile(`${tempTsFile}.video.m4s`, `${tsFile}.video.m4s`);
+							videoFiles.push({
 								type: 'Video',
 								path: `${tsFile}.video.m4s`,
 								lang: chosenAudios[0].language,
@@ -1021,12 +1034,14 @@ export default class Hidive implements ServiceClass {
 					}
 				}
 			}
-		} else {
-			console.info('Skipping Video');
-		}
+		})();
 
-		if (!options.noaudio) {
-			for (const audio of chosenAudios) {
+		const audioJob = (async () => {
+			if (options.noaudio) {
+				console.info('Skipping Audio');
+				return;
+			}
+			for (const [audioIndex, audio] of chosenAudios.entries()) {
 				const chosenAudioSegments = audio;
 				//Download Audio (if available)
 				const totalParts = chosenAudioSegments.segments.length;
@@ -1072,7 +1087,8 @@ export default class Hidive implements ServiceClass {
 					console.info('Decryption Needed, attempting to decrypt');
 					if (encryptionKeys.length == 0) {
 						console.error('Failed to get encryption keys');
-						return undefined;
+						audioJobFailed = true;
+						return;
 					}
 					if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
 						let commandBase = `--show-progress ${encryptionKeys.map((kb) => `--key ${kb.kid}:${kb.key}`).join(' ')} `;
@@ -1084,7 +1100,8 @@ export default class Hidive implements ServiceClass {
 						}
 
 						console.info('Started decrypting audio');
-						const decryptAudio = Helper.exec(
+						const audioDecryptStarted = Date.now();
+						const decryptAudio = await Helper.execAsync(
 							this.cfg.bin.shaka ? 'shaka-packager' : 'mp4decrypt',
 							this.cfg.bin.shaka ? `"${this.cfg.bin.shaka}"` : `"${this.cfg.bin.mp4decrypt}"`,
 							commandAudio
@@ -1096,29 +1113,33 @@ export default class Hidive implements ServiceClass {
 								console.error(`Downgrade to Shaka-Packager v2.6.1 (https://github.com/shaka-project/shaka-packager/releases/tag/v2.6.1) and try again`);
 							}
 							fs.renameSync(`${tempTsFile}.audio.enc.m4s`, `${tsFile}.audio.enc.m4s`);
-							return undefined;
+							audioJobFailed = true;
+							return;
 						} else {
 							if (!options.nocleanup) {
 								fs.unlinkSync(`${tempTsFile}.audio.enc.m4s`);
 							}
-							fs.copyFileSync(`${tempTsFile}.audio.m4s`, `${tsFile}.audio.m4s`);
-							fs.unlinkSync(`${tempTsFile}.audio.m4s`);
-							files.push({
-								type: 'Audio',
-								path: `${tsFile}.audio.m4s`,
-								lang: chosenAudioSegments.language,
-								isPrimary: chosenAudioSegments.default
-							});
-							console.info('Decryption done for audio');
+							Helper.moveFile(`${tempTsFile}.audio.m4s`, `${tsFile}.audio.m4s`);
+							audioFiles[audioIndex] = [
+								{
+									type: 'Audio',
+									path: `${tsFile}.audio.m4s`,
+									lang: chosenAudioSegments.language,
+									isPrimary: chosenAudioSegments.default
+								}
+							];
+							console.info(`Decryption done for audio (${Helper.formatTime((Date.now() - audioDecryptStarted) / 1000)})`);
 						}
 					} else {
 						console.warn('mp4decrypt not found, files need decryption. Decryption Keys:', encryptionKeys);
 					}
 				}
 			}
-		} else {
-			console.info('Skipping Audio');
-		}
+		})();
+
+		await Promise.all([videoJob, audioJob]);
+		if (videoJobFailed || audioJobFailed) return undefined;
+		files.push(...videoFiles, ...audioFiles.filter((entry): entry is DownloadedMedia[] => Boolean(entry)).flat());
 
 		if (options.dlsubs.indexOf('all') > -1) {
 			options.dlsubs = ['all'];
