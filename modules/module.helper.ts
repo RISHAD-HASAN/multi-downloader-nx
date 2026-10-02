@@ -19,6 +19,9 @@ export type ExecResult =
 	  };
 
 export default class Helper {
+	/** Longest subprocess output kept for the failure report (per stream). */
+	private static readonly maxCapturedOutput = 512 * 1024;
+
 	/** Non-blocking DRM subprocess. Never log arguments or child output containing keys. */
 	static decrypt(binary: string, args: string[]): Promise<void> {
 		return new Promise((resolve, reject) => {
@@ -45,8 +48,11 @@ export default class Helper {
 			let stdout = '';
 			let stderr = '';
 			if (quiet) {
-				child.stdout?.on('data', (data) => (stdout += data.toString()));
-				child.stderr?.on('data', (data) => (stderr += data.toString()));
+				// A --show-progress decrypt can talk for the length of a multi-GB
+				// file: keep the tail only, a failure report does not need more.
+				const capture = (current: string, data: Buffer) => (current + data).slice(-Helper.maxCapturedOutput);
+				child.stdout?.on('data', (data) => (stdout = capture(stdout, data.toString())));
+				child.stderr?.on('data', (data) => (stderr = capture(stderr, data.toString())));
 			}
 			child.once('error', (error) => {
 				resolve({ isOk: false, err: Object.assign(error as Error, { code: 1 }) });

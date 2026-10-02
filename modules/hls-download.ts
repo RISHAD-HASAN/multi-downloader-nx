@@ -137,7 +137,9 @@ class hlsDownload {
 						// vouch for; cut them so the parts that follow stay aligned.
 						if (typeof resumeData.bytes == 'number' && resumeData.bytes >= 0) {
 							const size = (await fs.stat(fn)).size;
-							if (size != resumeData.bytes) {
+							// Only cut: a marker past the end of the file cannot be
+							// trusted, and padding the file with zeroes would corrupt it.
+							if (size > resumeData.bytes) {
 								await fs.truncate(fn, resumeData.bytes);
 								console.debug(`Trimmed ${size - resumeData.bytes} byte(s) written after the last resume marker`);
 							}
@@ -184,8 +186,9 @@ class hlsDownload {
 		}
 		// start time
 		this.data.dateStart = Date.now();
-		// Bytes already on disk (resumed prefix) and bytes covered by complete parts
-		let startBytes = this.data.isResume ? (await fs.stat(fn)).size : 0;
+		// Bytes already on disk (resumed prefix) and bytes covered by complete parts.
+		// An explicit offset may target a file that does not exist yet.
+		let startBytes = this.data.isResume && fsp.existsSync(fn) ? (await fs.stat(fn)).size : 0;
 		let committedBytes = startBytes;
 		let segments = this.data.m3u8json.segments;
 		// download init part

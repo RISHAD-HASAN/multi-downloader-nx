@@ -128,6 +128,23 @@ import path from 'node:path';
 			assert.equal(fs.existsSync(marker), false, 'subprocess arguments must not be evaluated by a shell');
 			assert.equal(Helper.exec('node', process.execPath, ['-e', script, output, 'array argument']).isOk, true);
 			assert.equal(fs.readFileSync(output, 'utf8'), 'array argument');
+
+			// The background runner keeps the same contract: the event loop is
+			// free while the child works, a failure still reports its exit code,
+			// and an unspawnable binary resolves instead of throwing.
+			assert.equal((await Helper.execAsync('node', process.execPath, ['-e', script, output, 'async argument'])).isOk, true);
+			assert.equal(fs.readFileSync(output, 'utf8'), 'async argument');
+			const asyncFail = await Helper.execAsync('node', process.execPath, ['-e', 'process.exit(3)']);
+			assert.equal(asyncFail.isOk, false);
+			if (!asyncFail.isOk) assert.equal(asyncFail.err.code, 3, 'a non-zero exit code must reach the caller');
+			const missingBin = await Helper.execAsync('anidl-no-such-binary', 'anidl-no-such-binary', []);
+			assert.equal(missingBin.isOk, false, 'a binary that cannot be spawned must resolve as a failure');
+
+			// Moving a finished track must put it in place and leave nothing behind.
+			const moved = path.join(execTemp, 'moved.txt');
+			Helper.moveFile(output, moved);
+			assert.equal(fs.readFileSync(moved, 'utf8'), 'async argument');
+			assert.equal(fs.existsSync(output), false, 'a rename must not leave the source behind');
 		} finally {
 			fs.rmSync(execTemp, { recursive: true, force: true });
 		}
