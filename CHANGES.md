@@ -149,6 +149,11 @@ Fixes the ports needed:
 - `module.merger.ts` muxes with the same background runner and reports how long
   ffmpeg/mkvmerge took, instead of freezing the process while a multi-GB file is
   remuxed.
+- Tracks transferring at the same time can both hit the "file already exists"
+  prompt; `Helper.question` now queues prompts so each answer belongs to one
+  question instead of two readline interfaces reading the same stdin. Captured
+  subprocess output is capped at the last 512 KB per stream, so a chatty
+  `--show-progress` decrypt cannot buffer a whole multi-GB run in memory.
 
 ## Known limitations
 

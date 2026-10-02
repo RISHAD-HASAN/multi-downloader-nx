@@ -22,6 +22,9 @@ export default class Helper {
 	/** Longest subprocess output kept for the failure report (per stream). */
 	private static readonly maxCapturedOutput = 512 * 1024;
 
+	/** Serializes interactive prompts (see question). */
+	private static promptQueue: Promise<unknown> = Promise.resolve();
+
 	/** Non-blocking DRM subprocess. Never log arguments or child output containing keys. */
 	static decrypt(binary: string, args: string[]): Promise<void> {
 		return new Promise((resolve, reject) => {
@@ -86,11 +89,22 @@ export default class Helper {
 		}
 	}
 
-	static async question(q: string) {
-		const rl = readline.createInterface({ input, output });
-		const a = await rl.question(q);
-		rl.close();
-		return a;
+	/**
+	 * Prompts are queued: two tracks transferring at once can both find an
+	 * existing file, and two live readline interfaces would fight over the same
+	 * stdin answer. They take turns instead.
+	 */
+	static question(q: string): Promise<string> {
+		const ask = Helper.promptQueue.then(async () => {
+			const rl = readline.createInterface({ input, output });
+			try {
+				return await rl.question(q);
+			} finally {
+				rl.close();
+			}
+		});
+		Helper.promptQueue = ask.catch(() => undefined);
+		return ask;
 	}
 	static formatTime(t: number) {
 		const totalSeconds = Math.round(t);
