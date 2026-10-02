@@ -15,19 +15,13 @@ const binCfgFile = path.join(workingDir, 'config', 'bin-path');
 const dirCfgFile = path.join(workingDir, 'config', 'dir-path');
 const guiCfgFile = path.join(workingDir, 'config', 'gui');
 const cliCfgFile = path.join(workingDir, 'config', 'cli-defaults');
-const hdPflCfgFile = path.join(workingDir, 'config', 'hd_profile');
 const sessCfgFile = {
-	cr: path.join(workingDir, 'config', 'cr_sess'),
-	hd: path.join(workingDir, 'config', 'hd_sess'),
-	adn: path.join(workingDir, 'config', 'adn_sess')
+	cr: path.join(workingDir, 'config', 'cr_sess')
 };
 const vaultCfgFile = path.join(workingDir, 'config', 'vaults');
 const stateFile = path.join(workingDir, 'config', 'guistate');
 const tokenFile = {
-	cr: path.join(workingDir, 'config', 'cr_token'),
-	hd: path.join(workingDir, 'config', 'hd_token'),
-	hdNew: path.join(workingDir, 'config', 'hd_new_token'),
-	adn: path.join(workingDir, 'config', 'adn_token')
+	cr: path.join(workingDir, 'config', 'cr_token')
 };
 
 export const ensureConfig = () => {
@@ -341,114 +335,6 @@ const saveCRToken = (data: Record<string, unknown>) => {
 	}
 };
 
-const loadADNToken = () => {
-	let token = loadYamlCfgFile(tokenFile.adn, true);
-	if (typeof token !== 'object' || token === null || Array.isArray(token)) {
-		token = {};
-	}
-	return token;
-};
-
-const saveADNToken = (data: Record<string, unknown>) => {
-	const cfgFolder = path.dirname(tokenFile.adn);
-	try {
-		fs.mkdirSync(cfgFolder, { recursive: true });
-		fs.writeFileSync(`${tokenFile.adn}.yml`, yaml.stringify(data));
-	} catch (e) {
-		console.error("Can't save token file to disk!");
-	}
-};
-
-const loadHDSession = () => {
-	let session = loadYamlCfgFile(sessCfgFile.hd, true);
-	if (typeof session !== 'object' || session === null || Array.isArray(session)) {
-		session = {};
-	}
-	for (const cv of Object.keys(session)) {
-		if (typeof session[cv] !== 'object' || session[cv] === null || Array.isArray(session[cv])) {
-			session[cv] = {};
-		}
-	}
-	return session;
-};
-
-const saveHDSession = (data: Record<string, unknown>) => {
-	const cfgFolder = path.dirname(sessCfgFile.hd);
-	try {
-		fs.mkdirSync(cfgFolder, { recursive: true });
-		fs.writeFileSync(`${sessCfgFile.hd}.yml`, yaml.stringify(data));
-	} catch (e) {
-		console.error("Can't save session file to disk!");
-	}
-};
-
-const loadHDToken = () => {
-	let token = loadYamlCfgFile(tokenFile.hd, true);
-	if (typeof token !== 'object' || token === null || Array.isArray(token)) {
-		token = {};
-	}
-	return token;
-};
-
-const saveHDToken = (data: Record<string, unknown>) => {
-	const cfgFolder = path.dirname(tokenFile.hd);
-	try {
-		fs.mkdirSync(cfgFolder, { recursive: true });
-		fs.writeFileSync(`${tokenFile.hd}.yml`, yaml.stringify(data));
-	} catch (e) {
-		console.error("Can't save token file to disk!");
-	}
-};
-
-const saveHDProfile = (data: Record<string, unknown>) => {
-	const cfgFolder = path.dirname(hdPflCfgFile);
-	try {
-		fs.mkdirSync(cfgFolder, { recursive: true });
-		fs.writeFileSync(`${hdPflCfgFile}.yml`, yaml.stringify(data));
-	} catch (e) {
-		console.error("Can't save profile file to disk!");
-	}
-};
-
-const loadHDProfile = () => {
-	let profile = loadYamlCfgFile(hdPflCfgFile, true);
-	if (typeof profile !== 'object' || profile === null || Array.isArray(profile) || Object.keys(profile).length === 0) {
-		profile = {
-			// base
-			ipAddress: '',
-			xNonce: '',
-			xSignature: '',
-			// personal
-			visitId: '',
-			// profile data
-			profile: {
-				userId: 0,
-				profileId: 0,
-				deviceId: ''
-			}
-		};
-	}
-	return profile;
-};
-
-const loadNewHDToken = () => {
-	let token = loadYamlCfgFile(tokenFile.hdNew, true);
-	if (typeof token !== 'object' || token === null || Array.isArray(token)) {
-		token = {};
-	}
-	return token;
-};
-
-const saveNewHDToken = (data: Record<string, unknown>) => {
-	const cfgFolder = path.dirname(tokenFile.hdNew);
-	try {
-		fs.mkdirSync(cfgFolder, { recursive: true });
-		fs.writeFileSync(`${tokenFile.hdNew}.yml`, yaml.stringify(data));
-	} catch (e) {
-		console.error("Can't save token file to disk!");
-	}
-};
-
 const cfgDir = path.join(workingDir, 'config');
 
 const getState = (): GuiState => {
@@ -494,29 +380,4 @@ const setState = (state: GuiState) => {
 	}
 };
 
-export {
-	loadBinCfg,
-	loadCfg,
-	saveCRSession,
-	loadCRSession,
-	saveCRToken,
-	loadCRToken,
-	saveADNToken,
-	loadADNToken,
-	saveHDSession,
-	loadHDSession,
-	saveHDToken,
-	loadHDToken,
-	saveNewHDToken,
-	loadNewHDToken,
-	saveHDProfile,
-	loadHDProfile,
-	getState,
-	setState,
-	writeYamlCfgFile,
-	loadVaultCfg,
-	vaultCfgFile,
-	sessCfgFile,
-	hdPflCfgFile,
-	cfgDir
-};
+export { loadBinCfg, loadCfg, saveCRSession, loadCRSession, saveCRToken, loadCRToken, getState, setState, writeYamlCfgFile, loadVaultCfg, vaultCfgFile, sessCfgFile, cfgDir };

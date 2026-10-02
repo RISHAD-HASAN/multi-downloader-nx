@@ -1,7 +1,4 @@
-// End-to-end DUAL tag check: the real downloadMediaList() for one episode with two
-// dubs (Japanese + English) against a stubbed network. The tag only reaches a
-// filename through the ${audio} variable, so both halves are covered: it lands in
-// the name when the template asks for it, and the run says so when it cannot.
+// DUAL tag end to end through the real downloadMediaList(), with a stubbed network.
 
 import assert from 'node:assert/strict';
 import path from 'node:path';

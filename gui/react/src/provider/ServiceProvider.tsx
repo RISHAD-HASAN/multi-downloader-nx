@@ -3,7 +3,7 @@ import { Box, Button, Typography, Avatar } from '@mui/material';
 import useStore from '../hooks/useStore';
 import { StoreState } from './Store';
 
-type Services = 'crunchy' | 'hidive' | 'adn';
+type Services = 'crunchy';
 
 export const serviceContext = React.createContext<Services | undefined>(undefined);
 
@@ -30,17 +30,6 @@ const ServiceProvider: FCWithChildren = ({ children }) => {
 					startIcon={<Avatar src={'https://static.crunchyroll.com/cxweb/assets/img/favicons/favicon-32x32.png'} />}
 				>
 					Crunchyroll
-				</Button>
-				<Button
-					size="large"
-					variant="contained"
-					onClick={() => setService('hidive')}
-					startIcon={<Avatar src={'https://static.diceplatform.com/prod/original/dce.hidive/settings/HIDIVE_AppLogo_1024x1024.0G0vK.jpg'} />}
-				>
-					Hidive
-				</Button>
-				<Button size="large" variant="contained" onClick={() => setService('adn')} startIcon={<Avatar src={'https://animationdigitalnetwork.com/favicon.ico'} />}>
-					AnimationDigitalNetwork
 				</Button>
 			</Box>
 		</Box>

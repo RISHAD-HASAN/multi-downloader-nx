@@ -1,6 +1,4 @@
-// Vault lookup in front of the CDM: parse the KIDs out of the PSSH, ask the
-// vaults, call the licence server only for what is still missing, and write back
-// anything new.
+// Vault lookup in front of the CDM: KIDs from the PSSH, licence server last.
 
 import { console } from './log';
 import { cekTree } from './module.console';
@@ -154,9 +152,7 @@ export interface DrmResolveOptions {
 	print?: boolean;
 }
 
-// Resolve content keys for a PSSH, vaults first: parse the KIDs, query the vault
-// chain (local before remote), call the licence server for whatever is missing,
-// then push the new keys back into the writable vaults.
+// Resolve keys for a PSSH: vaults first, licence server for the rest.
 export async function resolveKeys(opts: DrmResolveOptions): Promise<KeyContainerLike[]> {
 	const { service, drm, pssh, licence } = opts;
 	const vaults = getVaults(service);

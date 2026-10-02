@@ -48,7 +48,6 @@ export type MergerOptions = {
 	ccTag: string;
 	output: string;
 	videoTitle?: string;
-	simul?: boolean;
 	inverseTrackOrder?: boolean;
 	keepAllVideos?: boolean;
 	fonts?: ParsedFont[];
@@ -170,10 +169,7 @@ class Merger {
 			audioIndex++;
 		}
 
-		// Mirror mkvmerge's --default-track handling: flag the audio stream that
-		// matches the configured default language and clear the flag on the rest.
-		// A single audio track keeps FFmpeg's own default, so only act when the
-		// output really carries a track choice.
+		// mirror mkvmerge's --default-track handling
 		const audioTrackCount = this.options.videoAndAudio.length + this.options.onlyAudio.length;
 		if (audioTrackCount > 1) {
 			const defaultAudio = this.defaultAudioIndex();
@@ -225,9 +221,7 @@ class Merger {
 		return args.join(' ');
 	}
 
-	// Index of the audio stream that should carry the "default" disposition under
-	// FFmpeg: the first track matching the configured default language, in mapping
-	// order (videoAndAudio first, then onlyAudio). -1 when nothing matches.
+	// first audio stream matching the configured default language, -1 if none
 	public defaultAudioIndex(): number {
 		const wanted = this.options.defaults?.audio?.code;
 		if (!wanted) return -1;
@@ -256,7 +250,7 @@ class Merger {
 		for (const vid of this.options.onlyVid) {
 			if (!hasVideo || this.options.keepAllVideos) {
 				args.push('--video-tracks 0', '--no-audio');
-				const trackName = (this.options.videoTitle ?? vid.lang.name) + (this.options.simul ? ' [Simulcast]' : ' [Uncut]');
+				const trackName = (this.options.videoTitle ?? vid.lang.name) + ' [Uncut]';
 				args.push('--track-name', `0:"${trackName}"`);
 				args.push(`--language 0:${vid.lang.code}`);
 				hasVideo = true;
@@ -272,9 +266,8 @@ class Merger {
 			}
 			if (!hasVideo || this.options.keepAllVideos) {
 				args.push(`--video-tracks ${videoTrackNum}`, `--audio-tracks ${audioTrackNum}`);
-				const trackName = (this.options.videoTitle ?? vid.lang.name) + (this.options.simul ? ' [Simulcast]' : ' [Uncut]');
+				const trackName = (this.options.videoTitle ?? vid.lang.name) + ' [Uncut]';
 				args.push('--track-name', `0:"${trackName}"`);
-				//args.push('--track-name', `1:"${trackName}"`);
 				args.push(`--language ${audioTrackNum}:${vid.lang.code}`);
 				if (this.options.defaults.audio.code === vid.lang.code) {
 					args.push(`--default-track ${audioTrackNum}`);
@@ -327,7 +320,6 @@ class Merger {
 					`0:"${(subObj.language.language || subObj.language.name) + `${subObj.closedCaption === true ? ` ${this.options.ccTag}` : ''}` + `${subObj.signs === true ? ' Signs' : ''}`}"`
 				);
 				args.push('--language', `0:"${subObj.language.code}"`);
-				//console.log('signSubsForced:', options.signSubsForced)
 				// Add forced/default control for Signs subtitles
 				if (subObj.signs) {
 					switch (this.options.signSubsForced) {
@@ -467,8 +459,7 @@ class Merger {
 			return;
 		}
 		console.debug(`[${type}] Started merging`);
-		// Awaited but non-blocking: muxing a multi-GB file must not freeze the
-		// event loop (and with it the live view) while it runs.
+		// background subprocess, so a long mux does not freeze the event loop
 		const mergeStarted = Date.now();
 		const res = await Helper.execAsync(type, `"${bin}"`, command);
 		if (!res.isOk && type === 'mkvmerge' && res.err.code === 1) {

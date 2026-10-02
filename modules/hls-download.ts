@@ -133,12 +133,9 @@ class hlsDownload {
 						console.debug('Resume data is ok!');
 						this.data.offset = resumeData.completed;
 						this.data.isResume = true;
-						// A crash can leave bytes on disk that the marker does not
-						// vouch for; cut them so the parts that follow stay aligned.
+						// drop anything a crash wrote past the marker
 						if (typeof resumeData.bytes == 'number' && resumeData.bytes >= 0) {
 							const size = (await fs.stat(fn)).size;
-							// Only cut: a marker past the end of the file cannot be
-							// trusted, and padding the file with zeroes would corrupt it.
 							if (size > resumeData.bytes) {
 								await fs.truncate(fn, resumeData.bytes);
 								console.debug(`Trimmed ${size - resumeData.bytes} byte(s) written after the last resume marker`);
@@ -186,8 +183,7 @@ class hlsDownload {
 		}
 		// start time
 		this.data.dateStart = Date.now();
-		// Bytes already on disk (resumed prefix) and bytes covered by complete parts.
-		// An explicit offset may target a file that does not exist yet.
+		// bytes on disk, and bytes that complete parts have covered
 		let startBytes = this.data.isResume && fsp.existsSync(fn) ? (await fs.stat(fn)).size : 0;
 		let committedBytes = startBytes;
 		let segments = this.data.m3u8json.segments;
@@ -225,11 +221,7 @@ class hlsDownload {
 			console.debug(`Resuming download from part ${this.data.offset + 1}...`);
 			this.data.parts.completed = this.data.offset;
 		}
-		// dl process: a fixed worker pool drains the whole playlist and a single
-		// ordered writer appends parts as soon as the gap in front of them is
-		// filled, so a straggler never idles the other connections and disk
-		// writes overlap the transfers instead of pausing them.
-		const totalSeg = (segments?.length ?? 0) + this.data.offset; // Add the sliced length back so the resume data will be correct even if a resumed download fails
+		const totalSeg = (segments?.length ?? 0) + this.data.offset; // total of the full playlist, resume included
 		let nextToWrite = this.data.offset;
 		let nextIndex = 0;
 		let errcnt = 0;
@@ -237,8 +229,7 @@ class hlsDownload {
 		let lastReported = this.data.offset;
 		const pendingParts = new Map<number, Buffer>();
 		const handle = await fs.open(fn, 'a');
-		// Raw bytes written to disk (used to continue after a short write)
-		let writtenBytes = committedBytes;
+		let writtenBytes = committedBytes; // may run ahead of committedBytes
 
 		const writePart = async (buf: Buffer): Promise<boolean> => {
 			let attempt = 0;
@@ -251,8 +242,7 @@ class hlsDownload {
 						written += bytesWritten;
 						writtenBytes += bytesWritten;
 					}
-					// The part is complete only now: the marker must never claim
-					// bytes that a failed write left half-finished.
+					// only a fully written part is resumable
 					committedBytes = writtenBytes;
 					return true;
 				} catch (err) {
@@ -313,7 +303,6 @@ class hlsDownload {
 				});
 		};
 
-		// Append every part whose turn has come; progress follows what is on disk.
 		const flushParts = async (): Promise<boolean> => {
 			while (pendingParts.has(nextToWrite)) {
 				const buf = pendingParts.get(nextToWrite) as Buffer;
@@ -379,7 +368,6 @@ class hlsDownload {
 		}
 		// final progress + resume marker, then the marker goes away with the finished file
 		await reportProgress(true);
-		// return result
 		await fs.unlink(`${fn}.resume`);
 		return { ok: true, parts: this.data.parts };
 	}
@@ -405,10 +393,6 @@ class hlsDownload {
 				false
 			);
 			if (!part) throw new Error('no response body (see the warning above for the transport error)');
-			// if (this.data.checkPartLength) {
-			//   this.data.checkPartLength = false;
-			//   console.warn(`Part ${segIndex + segOffset + 1}: can't check parts size!`);
-			// }
 			if (decipher == undefined) {
 				this.data.bytesDownloaded += Buffer.from(part).byteLength;
 				return { dec: Buffer.from(part), p };
@@ -422,8 +406,6 @@ class hlsDownload {
 		}
 		return { dec, p };
 	}
-	// One fetch per key URI: every part pointing at the same key shares the
-	// in-flight download instead of hitting the key server once per part.
 	private fetchKey(kURI: string, partIndex: number): Promise<Buffer> {
 		const cached = this.data.keys[kURI];
 		if (cached) return Promise.resolve(Buffer.from(cached));
@@ -442,7 +424,6 @@ class hlsDownload {
 				return key;
 			},
 			(error) => {
-				// Let the next part retry the key instead of poisoning the playlist
 				this.keyPromises.delete(kURI);
 				throw error;
 			}
@@ -460,8 +441,7 @@ class hlsDownload {
 				throw error;
 			}
 		}
-		// get ivs: without an explicit IV the HLS spec uses the media sequence
-		// number of the part, so the index must be absolute (resume included)
+		// no explicit IV: the HLS spec uses the media sequence number of the part
 		const iv = Buffer.alloc(16);
 		const ivs = key.iv ? key.iv : [0, 0, 0, p + 1];
 		for (let i = 0; i < ivs.length; i++) {

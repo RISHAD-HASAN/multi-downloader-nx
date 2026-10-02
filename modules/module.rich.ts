@@ -1185,9 +1185,7 @@ export class Live {
 
 export type LogLevel = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 
-// log4js/`util.format` argument handling, so call sites like
-// `console.info('Your Country: %s', country)` keep substituting. Errors render
-// as their stack, as the old logger did.
+// util.format argument handling: '%s' substitution and Error stacks.
 export function formatArgs(args: any[]): string {
 	if (args.length === 0) return '';
 	const mapped = args.map((a) => (a instanceof Error ? a.stack || a.message : a));

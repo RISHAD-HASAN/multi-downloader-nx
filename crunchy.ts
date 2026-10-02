@@ -2512,8 +2512,6 @@ export default class Crunchy implements ServiceClass {
 										}
 										throw error;
 									}
-									// A rename puts the finished track in place: copying the
-									// decrypted bytes again would double the disk writes.
 									Helper.moveFile(output, destination);
 									if (!options.nocleanup) fs.unlinkSync(input);
 									trackState(trackKey, 'Decrypted');
@@ -3270,9 +3268,8 @@ export default class Crunchy implements ServiceClass {
 		if (dlFailed) console.warn('[MDNX] Some stream downloads or decryption failed.');
 		else console.info('[green][MDNX] All stream downloads & decryption completed.[/]');
 
-		// Rebuild ${audio} from the dubs that actually completed, so a failed second
-		// dub does not keep "DUAL." in the name. A template without ${audio} has
-		// nowhere to put the tag; that gets reported instead of dropped.
+		// Rebuild ${audio} from the dubs that completed, and report when the
+		// template has nowhere to put the tag.
 		if (files.some((file) => file.type === 'Audio' || file.type === 'Video')) {
 			const requestedDual = variables.some((variable) => variable.name === 'audio' && variable.replaceWith === 'DUAL.');
 			if (applyActualAudioTag(variables, files, options.fileName) && fileName) {
@@ -3358,7 +3355,6 @@ export default class Crunchy implements ServiceClass {
 						signs: a.signs
 					};
 				}),
-			simul: false,
 			keepAllVideos: options.keepAllVideos,
 			fonts: Merger.makeFontsList(this.cfg.dir.fonts, data.filter((a) => a.type === 'Subtitle') as sxItem[]),
 			videoAndAudio: hasAudioStreams

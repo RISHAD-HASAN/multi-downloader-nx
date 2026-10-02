@@ -91,8 +91,7 @@ import path from 'node:path';
 			return Buffer.concat(parts);
 		};
 
-		// Buffers can be megabytes: a plain assert.deepEqual diff would format both
-		// sides and can blow up memory, so compare sizes and the first mismatch.
+		// never deepEqual large buffers: the diff formatting can exhaust memory
 		const assertBytes = (actual: Buffer, expected: Buffer, message: string) => {
 			if (actual.length !== expected.length) {
 				throw new Error(`${message}: size ${actual.length} != expected ${expected.length}`);

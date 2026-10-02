@@ -4,7 +4,7 @@ If you find any bugs in this documentation or in the program itself please repor
 
 ## Legal Warning
 
-This application is not endorsed by or affiliated with *Crunchyroll*, *Hidive* or *AnimationDigitalNetwork*.
+This application is not endorsed by or affiliated with *Crunchyroll*.
 This application enables you to download videos for offline viewing which may be forbidden by law in your country.
 The usage of this application may also cause a violation of the *Terms of Service* between you and the stream provider.
 This tool is not responsible for your actions; please make an informed decision before using this application.
@@ -58,7 +58,7 @@ Use this command to download all the fonts and add them to the muxed **mkv** fil
 #### `--fontName`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
-| Hidive, AnimationDigitalNetwork | `--fontName ${fontName}` | `string` | `No`| `NaN` | `NaN` |
+| Crunchyroll | `--fontName ${fontName}` | `string` | `No`| `NaN` | `NaN` |
 
 Set the font to use in subtiles
 ### Search
@@ -77,19 +77,19 @@ Search only for type of anime listings (e.g. episodes, series)
 #### `--page`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, Hidive | `--page ${page}` | `number` | `No`| `-p` | `NaN` |
+| Crunchyroll | `--page ${page}` | `number` | `No`| `-p` | `NaN` |
 
 The output is organized in pages. Use this command to output the items for the given page
 #### `--locale`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, AnimationDigitalNetwork | `--locale ${locale}` | `string` | `No`| `NaN` | [`''`, `und`, `en-US`, `en-IN`, `es-LA`, `es-419`, `es-ES`, `pt-BR`, `pt-PT`, `fr-FR`, `de-DE`, `ar-ME`, `ar-SA`, `it-IT`, `ru-RU`, `tr-TR`, `hi-IN`, `zh-CN`, `zh-TW`, `zh-HK`, `ko-KR`, `ca-ES`, `pl-PL`, `th-TH`, `ta-IN`, `ms-MY`, `vi-VN`, `id-ID`, `te-IN`, `und`, `fr`, `de`, `pl`] | `en-US`| `locale: ` |
+| Crunchyroll | `--locale ${locale}` | `string` | `No`| `NaN` | [`''`, `und`, `en-US`, `en-IN`, `es-LA`, `es-419`, `es-ES`, `pt-BR`, `pt-PT`, `fr-FR`, `de-DE`, `ar-ME`, `ar-SA`, `it-IT`, `ru-RU`, `tr-TR`, `hi-IN`, `zh-CN`, `zh-TW`, `zh-HK`, `ko-KR`, `ca-ES`, `pl-PL`, `th-TH`, `ta-IN`, `ms-MY`, `vi-VN`, `id-ID`, `te-IN`] | `en-US`| `locale: ` |
 
 Set the local that will be used for the API.
 #### `--new`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, Hidive | `--new ` | `boolean` | `No`| `NaN` | `NaN` |
+| Crunchyroll | `--new ` | `boolean` | `No`| `NaN` | `NaN` |
 
 Get last updated series list
 ### Downloading
@@ -99,6 +99,13 @@ Get last updated series list
 | Crunchyroll | `--absolute ` | `boolean` | `No`| `NaN` | `NaN` |
 
 Use absolute numbers for the episode. If not set, it will use the default index numbers
+#### `--url`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| All | `--url ${url}` | `string` | `No`| `-u` | `NaN` |
+
+Provide a series, season, or episode URL from Crunchyroll.
+The service and target IDs are automatically resolved.
 #### `--movie-listing`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
@@ -156,6 +163,12 @@ Allows you to download or view legacy Crunchyroll Ids
 | All | `-q ${qualityLevel}` | `number` | `No`| `NaN` | `0`| `q: ` |
 
 Set the quality level. Use 0 to use the maximum quality.
+#### `--list-formats`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| All | `--list-formats ` | `boolean` | `No`| `-F` | `false`| `list-formats: ` |
+
+List all available video and audio formats/qualities with their resolution, bitrate, and codec, then exit without downloading.
 #### `--dlVideoOnce`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -168,20 +181,13 @@ This will speed up the download speed, if multiple languages are selected.
 #### `--chapters`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, AnimationDigitalNetwork | `--chapters ` | `boolean` | `No`| `NaN` | `true`| `chapters: ` |
+| Crunchyroll | `--chapters ` | `boolean` | `No`| `NaN` | `true`| `chapters: ` |
 
 Will fetch the chapters and add them into the final video.
-#### `--removeBumpers`
-| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
-| --- | --- | --- | --- | --- | --- | ---| 
-| Hidive | `--removeBumpers ` | `boolean` | `No`| `NaN` | `true`| `removeBumpers: ` |
-
-If selected, it will remove the bumpers such as the hidive intro from the final file.
-Currently disabling this sometimes results in bugs such as video/audio desync
 #### `--originalFontSize`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
-| Hidive | `--originalFontSize ` | `boolean` | `No`| `NaN` | `true`| `originalFontSize: ` |
+| Crunchyroll | `--originalFontSize ` | `boolean` | `No`| `NaN` | `true`| `originalFontSize: ` |
 
 If selected, it will prefer to keep the original Font Size defined by the service.
 #### `-x`
@@ -208,24 +214,18 @@ Select a specific Crunchyroll video playback endpoint by device. androidtv provi
 | Crunchyroll | `--astream ${device}` | `string` | `No`| `--as` | [`androidtv`, `android`, `androidtab`, `none`] | `android`| `astream: ` |
 
 Select a specific Crunchyroll audio playback endpoint by device. android provides the best audio (192 kbps).
-#### `-F`, `--list-formats`
-| **Service** | **Usage** | **Type** | **Required** | **Alias** |
-| --- | --- | --- | --- | --- |
-| All | `-F` or `--list-formats` | `boolean` | `No` | `-F` |
-
-Show the available video and audio qualities without downloading, muxing, or recording the episode in the download archive. Crunchyroll also lists subtitles and estimated video sizes. An episode/season ID is still required.
 #### `--majin`
-| **Service** | **Usage** | **Type** | **Required** | **Default** |
-| --- | --- | --- | --- | --- |
-| Crunchyroll | `--majin` | `boolean` | `No` | `false` |
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| Crunchyroll | `--majin ` | `boolean` | `No`| `NaN` | `false`| `majin: ` |
 
-Force Crunchyroll's Majin VBR DASH encode. If it does not exist for a particular dub, that dub falls back to the original stream. Without an override, the downloader automatically compares Majin, CBR 0 and CBR 1.
+Enable Majin quality mode which transforms stream URLs for higher quality CENC DASH streams.
 #### `--cbr`
-| **Service** | **Usage** | **Type** | **Required** | **Default** |
-| --- | --- | --- | --- | --- |
-| Crunchyroll | `--cbr 0` or `--cbr 1` | `string` | `No` | automatic |
+| **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| Crunchyroll | `--cbr [0|1]` | `string` | `No`| `NaN` | [`0`, `1`] | `NaN` |
 
-Force CBR 0 (high-bitrate) or CBR 1 (standard) instead of the automatic stream comparison; takes precedence over `--majin`. An unavailable encode falls back to the original stream. Where a complete video file is accessible, its measured bitrate is shown; otherwise file sizes are estimates based on manifest bitrate and duration.
+Force a CBR stream instead of auto-comparison (0 = high bitrate, 1 = standard). Takes priority over --majin.
 #### `--tsd`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -254,7 +254,7 @@ Skips muxing when a subtitle download fails.
 #### `--noASSConv`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, Hidive | `--noASSConv ` | `boolean` | `No`| `NaN` | `false`| `noASSConv: ` |
+| Crunchyroll | `--noASSConv ` | `boolean` | `No`| `NaN` | `false`| `noASSConv: ` |
 
 Disables VTT conversion to ASS.
 #### `--noSubFix`
@@ -308,7 +308,7 @@ Skip downloading videos
 #### `--noaudio`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, Hidive | `--noaudio ` | `boolean` | `No`| `NaN` | `NaN` |
+| Crunchyroll | `--noaudio ` | `boolean` | `No`| `NaN` | `NaN` |
 
 Skip downloading audio
 #### `--nosubs`
@@ -337,12 +337,6 @@ Used to download all episodes from the show
 
 When converting the subtitles to ass, this will change the font size
 In most cases, requires "--originaFontSize false" to take effect
-#### `--combineLines`
-| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
-| --- | --- | --- | --- | --- | ---| 
-| Hidive | `--combineLines ` | `boolean` | `No`| `NaN` | `NaN` |
-
-If selected, will prevent a line from shifting downwards
 #### `--allDubs`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
@@ -358,15 +352,9 @@ Set the timeout of all download reqests. Set in millisecods
 #### `--waittime`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, Hidive | `--waittime ${waittime}` | `number` | `No`| `NaN` | `0`| `waittime: ` |
+| Crunchyroll | `--waittime ${waittime}` | `number` | `No`| `NaN` | `0`| `waittime: ` |
 
 Set the time the program waits between downloads. Set in millisecods
-#### `--simul`
-| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
-| --- | --- | --- | --- | --- | --- | ---| 
-| Hidive | `--simul ` | `boolean` | `No`| `NaN` | `false`| `simul: ` |
-
-Force downloading simulcast version instead of uncut version (if available).
 #### `--but`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
@@ -405,6 +393,12 @@ Set the time the downloader waits before retrying if an error while writing the 
 
 If a file already exists, the tool will ask you how to proceed. With this, you can answer in advance.
 ### Muxing
+#### `--signSubsForced`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | --- | ---| 
+| All | `--signSubsForced ` | `string` | `No`| `NaN` | [`yes`, `default`, `no`] | `no`| `signSubsForced: ` |
+
+Set sign subs as forced/default/none
 #### `--mp4`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -414,13 +408,13 @@ If selected, the output file will be an mp4 file (not recommended tho)
 #### `--keepAllVideos`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, Hidive | `--keepAllVideos ` | `boolean` | `No`| `NaN` | `false`| `keepAllVideos: ` |
+| Crunchyroll | `--keepAllVideos ` | `boolean` | `No`| `NaN` | `false`| `keepAllVideos: ` |
 
 If set to true, it will keep all videos in the merge process, rather than discarding the extra videos.
 #### `--syncTiming`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, Hidive | `--syncTiming ` | `boolean` | `No`| `NaN` | `false`| `syncTiming: ` |
+| Crunchyroll | `--syncTiming ` | `boolean` | `No`| `NaN` | `false`| `syncTiming: ` |
 
 If enabled attempts to sync timing for multi-dub downloads.
 NOTE: This is currently experimental and syncs audio and subtitles, though subtitles has a lot of guesswork
@@ -490,11 +484,12 @@ Possible Values: und, eng, eng, spa, spa-419, spa-ES, por, por, fra, deu, ara-ME
 Set the filename template. Use ${variable_name} to insert variables.
 You can also create folders by inserting a path seperator in the filename
 You may use 'title', 'episode', 'showTitle', 'seriesTitle', 'season', 'width', 'height', 'service', 'audio' as variables.
+#### `--outputDir`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| All | `--outputDir ${outputDir}` | `string` | `No`| `NaN` | ``| `outputDir: ` |
 
-`${audio}` expands to `DUAL.` when more than one audio dub actually finished downloading, and to an empty
-string otherwise. It only ends up in the filename when the template contains it, so a template without
-`${audio}` cannot show the tag - the downloader prints a warning when two dubs completed but the template
-has nowhere to put it.
+Set a custom directory for the final muxed file (supports template variables). Temporary files remain in the default content folder.
 #### `--numbers`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -530,10 +525,23 @@ Reset session cookie for testing purposes
 
 Debug mode (tokens may be revealed in the console output)
 ### Utilities
+#### `--theme`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | --- | ---| 
+| All | `--theme ${theme}` | `string` | `No`| `NaN` | [`catppuccin-mocha`, `dracula`, `nord`, `gruvbox`, `one-dark`, `mono`] | `catppuccin-mocha`| `theme: ` |
+
+Colour palette used by the console renderer.
+Available: catppuccin-mocha, dracula, nord, gruvbox, one-dark, mono.
+#### `--noColor`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| All | `--noColor ` | `boolean` | `No`| `NaN` | `false`| `noColor: ` |
+
+Disable all colour and styling in the console output
 #### `--service`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | --- | ---| 
-| All | `--service ${service}` | `string` | `Yes`| `NaN` | [`crunchy`, `hidive`, `adn`] | ``| `service: ` |
+| All | `--service ${service}` | `string` | `Yes`| `NaN` | [`crunchy`] | ``| `service: ` |
 
 Set the service you want to use
 #### `--update`
@@ -580,48 +588,3 @@ Proxies everything, not recommended. Proxy needs to be defined.
 
 Show the help output
 ### GUI
-
----
-
-## Content Key Vaults
-
-A vault caches `KID -> CONTENT KEY` pairs per service. When a title is
-re-downloaded - or when another dub or season shares the same keys - aniDL reads
-the key from the vault and never contacts the licence server.
-
-Configure in `config/vaults.yml`:
-
-```yaml
-enabled: true
-key_vaults:
-  - type: SQLite            # requires Node >= 22.5 (built-in node:sqlite)
-    name: 'Local Vault'
-    path: './config/key_vault.db'
-
-  # - type: JSON            # zero-dependency fallback for older Node
-  #   name: 'Local JSON Vault'
-  #   path: './config/key_vault.json'
-
-  # - type: API             # remote HTTP vault
-  #   name: 'Team Vault'
-  #   uri: 'https://vault.example.com/api'
-  #   token: 'your-secret-key'
-  #   no_push: false        # true = read-only
-```
-
-Local vaults are always queried before network vaults. Keys obtained from a
-licence are written back to every vault that does not set `no_push: true`.
-
-The schema matches devine's vaults, so `path` can point at an existing
-`key_vault.db`.
-
-## Console Theming
-
-| Option | Description |
-| ------ | ----------- |
-| `--theme <name>` | `catppuccin-mocha` (default), `dracula`, `nord`, `gruvbox`, `one-dark`, `mono` |
-| `--noColor` | Disable all colour and styling |
-
-Environment overrides: `ANIDL_THEME`, `ANIDL_NO_COLOR`, `ANIDL_LOG_LEVEL`
-(`debug`/`info`/`warning`/`error`).
-

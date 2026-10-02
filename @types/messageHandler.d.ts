@@ -1,5 +1,4 @@
 import { HLSCallback } from 'hls-download';
-import type { FunimationSearch } from './funiSearch';
 import type { AvailableMuxer } from '../modules/module.args';
 import { LanguageItem } from '../modules/module.langsData';
 
@@ -82,55 +81,8 @@ export type Episode = {
 export type SearchResponse = ResponseBase<SearchResponseItem[]>;
 export type EpisodeListResponse = ResponseBase<Episode[]>;
 
-export type FuniEpisodeData = {
-	title: string;
-	episode: string;
-	epsiodeNumber: string;
-	episodeID: string;
-	seasonTitle: string;
-	seasonNumber: string;
-	ids: {
-		episode: string;
-		show: string;
-		season: string;
-	};
-	image: string;
-};
-
 export type AuthData = { username: string; password: string };
 export type SearchData = { search: string; page?: number; 'search-type'?: string; 'search-locale'?: string };
-export type FuniGetShowData = { id: number; e?: string; but: boolean; all: boolean };
-export type FuniGetEpisodeData = { subs: FuniSubsData; fnSlug: FuniEpisodeData; simul?: boolean; dubLang: string[]; s: string };
-export type FuniStreamData = {
-	force?: 'Y' | 'y' | 'N' | 'n' | 'C' | 'c';
-	callbackMaker?: (data: DownloadInfo) => HLSCallback;
-	q: number;
-	x: number;
-	fileName: string;
-	numbers: number;
-	novids?: boolean;
-	timeout: number;
-	partsize: number;
-	fsRetryTime: number;
-	noaudio?: boolean;
-	mp4: boolean;
-	ass: boolean;
-	fontSize: number;
-	fontName?: string;
-	skipmux?: boolean;
-	forceMuxer: AvailableMuxer | undefined;
-	simul: boolean;
-	skipSubMux: boolean;
-	nocleanup: boolean;
-	override: string[];
-	videoTitle: string;
-	ffmpegOptions: string[];
-	mkvmergeOptions: string[];
-	defaultAudio: LanguageItem;
-	defaultSub: LanguageItem;
-	ccTag: string;
-};
-export type FuniSubsData = { nosubs?: boolean; sub: boolean; dlsubs: string[]; ccTag: string };
 export type DownloadData = {
 	hslang?: string;
 	id: string;
@@ -145,9 +97,6 @@ export type DownloadData = {
 };
 
 export type AuthResponse = ResponseBase<undefined>;
-export type FuniSearchReponse = ResponseBase<FunimationSearch>;
-export type FuniShowResponse = ResponseBase<FuniEpisodeData[]>;
-export type FuniGetEpisodeResponse = ResponseBase<undefined>;
 export type CheckTokenResponse = ResponseBase<undefined>;
 
 export type ResponseBase<T> =
