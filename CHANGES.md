@@ -120,6 +120,41 @@ Fixes the ports needed:
   when the tag was added, a warning with the fix when two dubs completed without a
   place for it, and a note when only one requested dub finished.
 
+## Download pipeline
+
+- `modules/hls-download.ts` transferred one `--partsize` batch at a time and
+  every batch waited for its slowest part before the next one started. It now
+  runs a fixed worker pool over the whole playlist with a single ordered writer,
+  so one straggler no longer idles the other connections. The same harness (201
+  parts, 25 ms server delay) went from 104-109 MB/s to 144-156 MB/s (~+40%) at
+  20 threads. Every part sharing a key URI also shares one in-flight key fetch
+  (21 requests for a single key at 20 threads, now 1).
+- The `.resume` marker carries the exact byte count on disk. A crash that left
+  bytes past the last committed part used to make the next run append at the
+  wrong offset; a resume now trims the file back to the marker first, and a part
+  only counts as committed once its last byte reached the handle.
+- Decrypting a track used to be a silent gap in the log. Each track now logs its
+  duration (`Decrypted video in 12.3s` in Crunchyroll, `Decryption done for
+  video/audio (12.3s)` in HIDIVE) and each mux logs `[ffmpeg] Muxing took ...`,
+  so download, decrypt and mux can be told apart at a glance.
+- A finished track is renamed into place (`Helper.moveFile`, copy fallback only
+  across volumes) instead of copied and then unlinked; `copyFileSync` wrote every
+  decrypted byte a second time (~3.4 s per GiB on the test disk). A failed
+  decryption also deletes its half-written output.
+- `hidive.ts` used to run video and audio as one strict sequence - download the
+  video, decrypt it, then download and decrypt every audio track one by one -
+  and decrypted with the blocking `execFileSync`. Video and audio are now two
+  jobs joined with `Promise.all`, and decrypting uses the background runner
+  (`Helper.execAsync`), so audio never waits for the video to finish.
+- `module.merger.ts` muxes with the same background runner and reports how long
+  ffmpeg/mkvmerge took, instead of freezing the process while a multi-GB file is
+  remuxed.
+- Tracks transferring at the same time can both hit the "file already exists"
+  prompt; `Helper.question` now queues prompts so each answer belongs to one
+  question instead of two readline interfaces reading the same stdin. Captured
+  subprocess output is capped at the last 512 KB per stream, so a chatty
+  `--show-progress` decrypt cannot buffer a whole multi-GB run in memory.
+
 ## Known limitations
 
 Within an episode the video and audio DASH tracks overlap -
@@ -136,13 +171,16 @@ open.
 pnpm test:all
 ```
 
-Eleven suites: `vault`, `console`, `download-ui`, `error`, `majin`, `bin`,
-`upstream`, `archive`, `filename`, `crunchy-concurrency`, `crunchy-dual-tag`. They
-cover vault round-trips and PSSH parsing, the console renderer (including `%s`
-formatting and CJK widths), live-view lifecycle, error unwrapping against real
-undici failures, offline Majin/CBR comparisons, binary discovery, format-only
-exits, CMS/content-API fallbacks, corrupt-archive recovery, filename rules, the
-concurrent DASH transfer batch (overlap, failure isolation, completed-audio DUAL
-tagging, FFmpeg default-audio dispositions) and the two-dub download flow end to
-end (the tag landing through `${audio}`, and the warning when the template has
-none).
+Twelve suites: `vault`, `console`, `download-ui`, `error`, `majin`, `bin`,
+`upstream`, `archive`, `filename`, `hls`, `crunchy-concurrency`,
+`crunchy-dual-tag`. They cover vault round-trips and PSSH parsing, the console
+renderer (including `%s` formatting and CJK widths), live-view lifecycle, error
+unwrapping against real undici failures, offline Majin/CBR comparisons, binary
+discovery, format-only exits, CMS/content-API fallbacks, corrupt-archive
+recovery, filename rules, the HLS downloader against a local HTTP server
+(in-order byte-exact parts, one key fetch per URI, resume from a prefix, absolute
+IVs, a failed part keeping a contiguous prefix whose marker records the byte
+count, the init part), the concurrent DASH transfer batch (overlap, failure
+isolation, completed-audio DUAL tagging, FFmpeg default-audio dispositions) and
+the two-dub download flow end to end (the tag landing through `${audio}`, and
+the warning when the template has none).

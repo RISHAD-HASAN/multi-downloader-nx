@@ -1,4 +1,5 @@
 // Helper functions
+import fs from 'fs';
 import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
 import childProcess from 'child_process';
@@ -8,7 +9,22 @@ import { console } from './log';
 // Subprocess output is hidden unless the user asked for --debug
 const quietDefault = () => richConsole.level !== 'debug' && process.env.isGUI !== 'true';
 
+export type ExecResult =
+	| {
+			isOk: true;
+	  }
+	| {
+			isOk: false;
+			err: Error & { code: number };
+	  };
+
 export default class Helper {
+	/** Longest subprocess output kept for the failure report (per stream). */
+	private static readonly maxCapturedOutput = 512 * 1024;
+
+	/** Serializes interactive prompts (see question). */
+	private static promptQueue: Promise<unknown> = Promise.resolve();
+
 	/** Non-blocking DRM subprocess. Never log arguments or child output containing keys. */
 	static decrypt(binary: string, args: string[]): Promise<void> {
 		return new Promise((resolve, reject) => {
@@ -18,11 +34,77 @@ export default class Helper {
 		});
 	}
 
-	static async question(q: string) {
-		const rl = readline.createInterface({ input, output });
-		const a = await rl.question(q);
-		rl.close();
-		return a;
+	/**
+	 * Same contract as exec(), but the child runs in the background: the event
+	 * loop keeps serving downloads and repainting the UI while ffmpeg/mkvmerge/
+	 * mp4decrypt work on a multi-GB file.
+	 */
+	static execAsync(pname: string, fpath: string, pargs: string | string[], spc = false): Promise<ExecResult> {
+		const quiet = quietDefault();
+		return new Promise((resolve) => {
+			const argv = Array.isArray(pargs) ? pargs : Helper.splitArguments(pargs);
+			const command = fpath.trim().replace(/^["']|["']$/g, '');
+			const display = argv.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg)).join(' ');
+			if (quiet) console.debug(`> "${pname}" ${display}`);
+			else console.info(`\n> "${pname}" ${display}${spc ? '\n' : ''}`);
+			const child = childProcess.spawn(command, argv, { stdio: quiet ? 'pipe' : 'inherit', windowsHide: true });
+			let stdout = '';
+			let stderr = '';
+			if (quiet) {
+				// A --show-progress decrypt can talk for the length of a multi-GB
+				// file: keep the tail only, a failure report does not need more.
+				const capture = (current: string, data: Buffer) => (current + data).slice(-Helper.maxCapturedOutput);
+				child.stdout?.on('data', (data) => (stdout = capture(stdout, data.toString())));
+				child.stderr?.on('data', (data) => (stderr = capture(stderr, data.toString())));
+			}
+			child.once('error', (error) => {
+				resolve({ isOk: false, err: Object.assign(error as Error, { code: 1 }) });
+			});
+			child.once('close', (code) => {
+				if (code === 0) return resolve({ isOk: true });
+				if (quiet) {
+					// The failure output was swallowed - surface it now.
+					const dump = [stdout, stderr].join('\n').trim();
+					if (dump) console.error(dump);
+				}
+				resolve({
+					isOk: false,
+					err: Object.assign(new Error(`${pname} exited with code ${code}`), { code: code ?? 1 })
+				});
+			});
+		});
+	}
+
+	/**
+	 * Move a finished file into place. A rename is instant on the same volume;
+	 * only a cross-device move falls back to copying the bytes again.
+	 */
+	static moveFile(from: string, to: string): void {
+		try {
+			fs.renameSync(from, to);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
+			fs.copyFileSync(from, to);
+			fs.unlinkSync(from);
+		}
+	}
+
+	/**
+	 * Prompts are queued: two tracks transferring at once can both find an
+	 * existing file, and two live readline interfaces would fight over the same
+	 * stdin answer. They take turns instead.
+	 */
+	static question(q: string): Promise<string> {
+		const ask = Helper.promptQueue.then(async () => {
+			const rl = readline.createInterface({ input, output });
+			try {
+				return await rl.question(q);
+			} finally {
+				rl.close();
+			}
+		});
+		Helper.promptQueue = ask.catch(() => undefined);
+		return ask;
 	}
 	static formatTime(t: number) {
 		const totalSeconds = Math.round(t);

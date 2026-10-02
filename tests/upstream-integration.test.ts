@@ -41,6 +41,20 @@ import path from 'node:path';
 		assert.ok(crunchySource.includes('if (!options.listFormats && !options.F && !this.cfg.bin.mp4decrypt'), 'format listing should work without a decryptor');
 		console.log('✓ format listing skips mux/archive in Crunchyroll and ADN, and bypasses CDM checks');
 
+		// Transfer/decrypt wiring: audio must not queue behind the whole video,
+		// decryption must not block the event loop, and a finished track must be
+		// renamed into place instead of being copied a second time.
+		const hidiveSource = fs.readFileSync(path.join(__dirname, '..', 'hidive.ts'), 'utf8');
+		const mergerSource = fs.readFileSync(path.join(__dirname, '..', 'modules', 'module.merger.ts'), 'utf8');
+		assert.ok(hidiveSource.includes('const videoJob = (async () => {'), 'HIDIVE video transfer must run as its own job');
+		assert.ok(hidiveSource.includes('await Promise.all([videoJob, audioJob]);'), 'HIDIVE audio must transfer while the video is still running');
+		assert.ok(!hidiveSource.includes('const decryptVideo = Helper.exec('), 'HIDIVE decryption must not block the event loop');
+		assert.ok(hidiveSource.includes('await Helper.execAsync('), 'HIDIVE must use the background subprocess runner');
+		assert.ok(hidiveSource.includes('Helper.moveFile('), 'HIDIVE must rename finished tracks instead of copying them');
+		assert.ok(crunchySource.includes('Helper.moveFile(output, destination);'), 'Crunchyroll must rename decrypted tracks instead of copying them');
+		assert.ok(mergerSource.includes('await Helper.execAsync(type'), 'muxing must not block the event loop');
+		console.log('✓ transfers run concurrently and finished tracks are renamed, not copied');
+
 		const cms = { bucket: '/test', policy: 'test', signature: 'test', key_pair_id: 'test' };
 		const json = (value: unknown) => ({ ok: true, res: new Response(JSON.stringify(value)) });
 		const failed = { ok: false, res: new Response(null, { status: 403 }) };
@@ -114,6 +128,23 @@ import path from 'node:path';
 			assert.equal(fs.existsSync(marker), false, 'subprocess arguments must not be evaluated by a shell');
 			assert.equal(Helper.exec('node', process.execPath, ['-e', script, output, 'array argument']).isOk, true);
 			assert.equal(fs.readFileSync(output, 'utf8'), 'array argument');
+
+			// The background runner keeps the same contract: the event loop is
+			// free while the child works, a failure still reports its exit code,
+			// and an unspawnable binary resolves instead of throwing.
+			assert.equal((await Helper.execAsync('node', process.execPath, ['-e', script, output, 'async argument'])).isOk, true);
+			assert.equal(fs.readFileSync(output, 'utf8'), 'async argument');
+			const asyncFail = await Helper.execAsync('node', process.execPath, ['-e', 'process.exit(3)']);
+			assert.equal(asyncFail.isOk, false);
+			if (!asyncFail.isOk) assert.equal(asyncFail.err.code, 3, 'a non-zero exit code must reach the caller');
+			const missingBin = await Helper.execAsync('anidl-no-such-binary', 'anidl-no-such-binary', []);
+			assert.equal(missingBin.isOk, false, 'a binary that cannot be spawned must resolve as a failure');
+
+			// Moving a finished track must put it in place and leave nothing behind.
+			const moved = path.join(execTemp, 'moved.txt');
+			Helper.moveFile(output, moved);
+			assert.equal(fs.readFileSync(moved, 'utf8'), 'async argument');
+			assert.equal(fs.existsSync(output), false, 'a rename must not leave the source behind');
 		} finally {
 			fs.rmSync(execTemp, { recursive: true, force: true });
 		}
