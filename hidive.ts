@@ -917,7 +917,8 @@ export default class Hidive implements ServiceClass {
 					Authorization: `Bearer ${selectedEpisode.jwtToken}`,
 					'X-Drm-Info': 'eyJzeXN0ZW0iOiJjb20ud2lkZXZpbmUuYWxwaGEifQ=='
 				},
-				'hidive'
+				'hidive',
+				true
 			);
 		}
 
@@ -929,7 +930,8 @@ export default class Hidive implements ServiceClass {
 					Authorization: `Bearer ${selectedEpisode.jwtToken}`,
 					'X-Drm-Info': 'eyJzeXN0ZW0iOiJjb20ubWljcm9zb2Z0LnBsYXlyZWFkeSJ9'
 				},
-				'hidive'
+				'hidive',
+				true
 			);
 		}
 
