@@ -119,6 +119,27 @@ export default class Helper {
 		return secondsS;
 	}
 
+	/**
+	 * Crunchyroll and friends fill `episodeTitle` with a bare placeholder
+	 * ("Episode 12", localized: Épisode/Episodio/Episódio/Folge, 第12話) when an
+	 * episode has no real title. In a filename that placeholder is only noise:
+	 * it collapses to an empty string, and parseFileName squeezes the dots the
+	 * empty slot leaves behind (Foo.S01E12..1080p -> Foo.S01E12.1080p).
+	 * Display code keeps the raw title - only filename templates are affected.
+	 */
+	static episodeTitleForFilename(title: string | undefined | null): string {
+		const clean = (title ?? '').trim();
+		if (!clean) return '';
+		const placeholderPatterns = [
+			// Episode / Épisode (fr) / Episodio (es, it) / Episódio (pt) / Folge (de)
+			/^(?:[eé]pis[oó]d(?:[ií][oó]|e)|folge)\s+\d+(?:\.\d+)?$/i,
+			// 第12話 / 第12回 (ja)
+			/^第\s*\d+\s*[話回]$/
+		];
+		if (placeholderPatterns.some((pattern) => pattern.test(clean))) return '';
+		return clean;
+	}
+
 	static cleanupFilename(n: string) {
 		/* eslint-disable no-useless-escape, no-control-regex */
 		// Smart Replacer

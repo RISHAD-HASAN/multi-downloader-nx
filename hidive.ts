@@ -400,21 +400,33 @@ export default class Hidive implements ServiceClass {
 			console.info('  No Seasons found!');
 			return { isOk: false };
 		}
+		// Seasons are independent, so they (and their cursor-bound page walks) are
+		// fetched concurrently; the listing below prints and samples them in the
+		// original order, so the output is exactly what the serial path produced.
+		const seasonResults = await Promise.all(
+			series.value.seasons.map(async (seasonData) => {
+				const season = await this.getSeason(seasonData.id);
+				if (!season.isOk || !season.value) {
+					return { isOk: false as const, id: seasonData.id };
+				}
+				while (season.value.paging.moreDataAvailable) {
+					const seasonPage = await this.getSeason(seasonData.id, season.value.paging.lastSeen);
+					if (!seasonPage.isOk || !seasonPage.value) break;
+					season.value.episodes = season.value.episodes.concat(seasonPage.value.episodes);
+					season.value.paging.lastSeen = seasonPage.value.paging.lastSeen;
+					season.value.paging.moreDataAvailable = seasonPage.value.paging.moreDataAvailable;
+				}
+				return { isOk: true as const, value: season.value };
+			})
+		);
 		const episodes: Episode[] = [];
-		for (const seasonData of series.value.seasons) {
-			const season = await this.getSeason(seasonData.id);
-			if (!season.isOk || !season.value) {
-				console.error('Failed to list series data: Failed to get season ' + seasonData.id);
+		for (const result of seasonResults) {
+			if (!result.isOk) {
+				console.error('Failed to list series data: Failed to get season ' + result.id);
 				return { isOk: false };
 			}
+			const season = { isOk: true, value: result.value };
 			console.info(`  [S.${season.value.id}] ${season.value.title} (${season.value.episodeCount} Episodes)`);
-			while (season.value.paging.moreDataAvailable) {
-				const seasonPage = await this.getSeason(seasonData.id, season.value.paging.lastSeen);
-				if (!seasonPage.isOk || !seasonPage.value) break;
-				season.value.episodes = season.value.episodes.concat(seasonPage.value.episodes);
-				season.value.paging.lastSeen = seasonPage.value.paging.lastSeen;
-				season.value.paging.moreDataAvailable = seasonPage.value.paging.moreDataAvailable;
-			}
 			let subLocales: string[] = [];
 			const sampleEp = season.value.episodes[0];
 			if (sampleEp) {
@@ -802,7 +814,7 @@ export default class Hidive implements ServiceClass {
 		variables.push(
 			...(
 				[
-					['title', selectedEpisode.title, true],
+					['title', Helper.episodeTitleForFilename(selectedEpisode.title), true],
 					['episode', selectedEpisode.episodeInformation.episodeNumber, false],
 					['service', 'HD', false],
 					['seriesTitle', selectedEpisode.seasonTitle, true],
@@ -1154,6 +1166,15 @@ export default class Hidive implements ServiceClass {
 
 		if (!options.skipsubs && options.dlsubs.indexOf('none') == -1) {
 			if (subs.length > 0) {
+				// The responses are fetched concurrently up front; the loop below
+				// still processes them in the original order and only awaits the
+				// already-running request, so no subtitle waits on the previous one.
+				const subResponses = new Map<string, Promise<reqModule.GetDataResponse>>();
+				for (const sub of subs) {
+					const subLang = langsData.languages.find((a) => a.new_hd_locale === sub.language);
+					if (!subLang) continue;
+					if (!subResponses.has(sub.url)) subResponses.set(sub.url, this.req.getData(sub.url));
+				}
 				let subIndex = 0;
 				for (const sub of subs) {
 					const subLang = langsData.languages.find((a) => a.new_hd_locale === sub.language);
@@ -1174,7 +1195,7 @@ export default class Hidive implements ServiceClass {
 					}
 					sxData.language = subLang;
 					if (options.dlsubs.includes('all') || options.dlsubs.includes(subLang.locale)) {
-						const getVttContent = await this.req.getData(sub.url);
+						const getVttContent = await (subResponses.get(sub.url) as Promise<reqModule.GetDataResponse>);
 						if (getVttContent.ok && getVttContent.res) {
 							let sBody = await getVttContent.res.text();
 

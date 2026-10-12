@@ -609,7 +609,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			variables.push(
 				...(
 					[
-						['title', data.name ?? data.title, true],
+						['title', Helper.episodeTitleForFilename(data.name ?? data.title), true],
 						['episode', isNaN(parseFloat(data.shortNumber)) ? data.shortNumber : parseFloat(data.shortNumber), false],
 						['service', 'ADN', false],
 						['seriesTitle', data.show.shortTitle ?? data.show.title, true],

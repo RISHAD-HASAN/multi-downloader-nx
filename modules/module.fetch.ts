@@ -11,6 +11,24 @@ const http1Agent = new Agent({
 	allowH2: false
 });
 
+// One ProxyAgent per proxy URI, reused across requests: a fresh agent per
+// request would throw away its connection pool and lose keep-alive on every
+// segment download.
+const proxyAgents = new Map<string, ProxyAgent>();
+const getProxyAgent = (uri: string): ProxyAgent => {
+	let agent = proxyAgents.get(uri);
+	if (!agent) {
+		agent = new ProxyAgent({
+			uri,
+			connections: 16,
+			connect: { ALPNProtocols: ['http/1.1'] },
+			allowH2: false
+		});
+		proxyAgents.set(uri, agent);
+	}
+	return agent;
+};
+
 export type FetchParams = Partial<RequestInit & CustomParams>;
 
 export type Params = {
@@ -27,7 +45,7 @@ type CustomParams = {
 	silent: boolean;
 };
 
-type GetDataResponse = {
+export type GetDataResponse = {
 	ok: boolean;
 	res?: Response;
 	headers?: Record<string, string>;
@@ -75,12 +93,7 @@ export class Req {
 		let dispatcher: Agent | ProxyAgent = http1Agent;
 		const validProxy = this.argv.proxy ? this.isValidProxyUrl(this.argv.proxy) : false;
 		if ((params.useProxy || this.argv.proxyAll) && this.argv.proxy && validProxy) {
-			dispatcher = new ProxyAgent({
-				uri: this.argv.proxy,
-				connections: 16,
-				connect: { ALPNProtocols: ['http/1.1'] },
-				allowH2: false
-			});
+			dispatcher = getProxyAgent(this.argv.proxy);
 		} else if ((params.useProxy || this.argv.proxyAll) && this.argv.proxy && !validProxy) {
 			console.warn('[Fetch] Provided invalid Proxy URL, not proxying traffic.');
 		}
