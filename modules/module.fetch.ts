@@ -5,26 +5,54 @@ import { argvC } from './module.app-args';
 import { Agent, ProxyAgent, fetch, RequestInit } from 'undici';
 import { describeError } from './module.error';
 
-const http1Agent = new Agent({
-	connections: 16,
-	connect: { ALPNProtocols: ['http/1.1'] },
-	allowH2: false
-});
+// The pool has to hold as many connections as the downloader actually wants.
+// A segment download opens one connection per worker and a video and an audio
+// transfer can be in flight at the same time, so the pool follows --partsize.
+// It used to be pinned at 16, and undici queues requests past the pool size per
+// origin - which silently made every --partsize above 16 a no-op.
+const MIN_CONNECTIONS = 16;
+// Past this the extra sockets cost file descriptors and CDN-side risk without
+// buying measurable throughput.
+const MAX_CONNECTIONS = 128;
 
-// One ProxyAgent per proxy URI, reused across requests: a fresh agent per
-// request would throw away its connection pool and lose keep-alive on every
-// segment download.
-const proxyAgents = new Map<string, ProxyAgent>();
-const getProxyAgent = (uri: string): ProxyAgent => {
-	let agent = proxyAgents.get(uri);
+/** Connections the pool needs for a given --partsize (both tracks + API headroom). */
+export const connectionCount = (partsize?: number): number => {
+	const requested = Number(partsize);
+	if (!Number.isFinite(requested) || requested < 1) return MIN_CONNECTIONS;
+	return Math.max(MIN_CONNECTIONS, Math.min(Math.floor(requested) * 2 + 4, MAX_CONNECTIONS));
+};
+
+// One agent per pool size: every Req in the process shares a pool for its size,
+// so keep-alive survives across service instances.
+const http1Agents = new Map<number, Agent>();
+const getHttp1Agent = (connections: number): Agent => {
+	let agent = http1Agents.get(connections);
 	if (!agent) {
-		agent = new ProxyAgent({
-			uri,
-			connections: 16,
+		agent = new Agent({
+			connections,
 			connect: { ALPNProtocols: ['http/1.1'] },
 			allowH2: false
 		});
-		proxyAgents.set(uri, agent);
+		http1Agents.set(connections, agent);
+	}
+	return agent;
+};
+
+// One ProxyAgent per proxy URI and pool size, reused across requests: a fresh
+// agent per request would throw away its connection pool and lose keep-alive on
+// every segment download.
+const proxyAgents = new Map<string, ProxyAgent>();
+const getProxyAgent = (uri: string, connections: number): ProxyAgent => {
+	const key = `${connections}|${uri}`;
+	let agent = proxyAgents.get(key);
+	if (!agent) {
+		agent = new ProxyAgent({
+			uri,
+			connections,
+			connect: { ALPNProtocols: ['http/1.1'] },
+			allowH2: false
+		});
+		proxyAgents.set(key, agent);
 	}
 	return agent;
 };
@@ -67,12 +95,15 @@ export type GetDataResponse = {
 // req
 export class Req {
 	private debug: boolean;
+	// Size of this client's HTTP/1.1 pool (see connectionCount)
+	private connections: number;
 	public argv: typeof argvC;
 
 	constructor() {
 		const cfg = yamlCfg.loadCfg();
 		this.argv = yargs.appArgv(cfg.cli, process.env.isGUI ? true : false);
 		this.debug = this.argv.debug ?? false;
+		this.connections = connectionCount(this.argv.partsize);
 	}
 
 	async getData(durl: string, params: Partial<RequestInit & CustomParams> = {}): Promise<GetDataResponse> {
@@ -90,10 +121,10 @@ export class Req {
 		}
 
 		// Proxy Handler
-		let dispatcher: Agent | ProxyAgent = http1Agent;
+		let dispatcher: Agent | ProxyAgent = getHttp1Agent(this.connections);
 		const validProxy = this.argv.proxy ? this.isValidProxyUrl(this.argv.proxy) : false;
 		if ((params.useProxy || this.argv.proxyAll) && this.argv.proxy && validProxy) {
-			dispatcher = getProxyAgent(this.argv.proxy);
+			dispatcher = getProxyAgent(this.argv.proxy, this.connections);
 		} else if ((params.useProxy || this.argv.proxyAll) && this.argv.proxy && !validProxy) {
 			console.warn('[Fetch] Provided invalid Proxy URL, not proxying traffic.');
 		}

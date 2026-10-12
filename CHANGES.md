@@ -33,6 +33,31 @@ hit the licence server again. The rest is fixes for what broke along the way.
   all`). The responses are requested concurrently up front; the existing loop
   still converts and writes them in the original order, so files and log output
   are unchanged.
+- **`--partsize` above 16 buys connections again.** `modules/module.fetch.ts`
+  pinned the HTTP/1.1 pool at 16 connections, and undici queues requests past the
+  pool size per origin - so the advice in the tool's own help text ("try
+  increasing this number to get a higher overall speed") did nothing past 16. On a
+  local server, 40 workers over a 16-connection pool were no faster than 20
+  (557 ms vs 660 ms); opening the pool to 40 halved that (295 ms). The pool is now
+  sized from `--partsize` (two tracks of workers plus API headroom, floored at the
+  old 16 and capped at 128), for the proxy agents too.
+- **Decrypt and mux no longer stop the next episode from downloading.** Episode N
+  used to finish its own multi-GB decrypt and mkvmerge pass before episode N+1
+  started, so the tail of every episode sat in the middle of the run doing nothing
+  with the network. Post-download work is now queued in `modules/module.tail-queue.ts`
+  and runs behind the next episode's download: per-track decrypts are queued from
+  inside their own transfer, the mux is queued behind them, tasks run one at a time
+  in order, and `cli()` drains the queue before the run ends (the GUI handler does
+  the same before reporting `finish`). A failure is collected and reported at the
+  end instead of aborting the season; a track whose decrypt failed is dropped from
+  the mux input so the mux reports the missing track instead of a bogus merge
+  error, and the episode is only written to the download archive once its tail
+  ran, so a failed decrypt cannot make a later `--downloadArchive` run skip the
+  episode for good. The live view is untouched: a deferred decrypt reports into its own
+  episode's rows only while that view is still on screen (session tokens in
+  `module.download-ui.ts`), so a late failure cannot paint the next episode's row.
+  Cost of the overlap: the encrypted temp of episode N stays on disk while N+1
+  downloads, so peak disk use is one episode higher than before.
 
 > [unshackle](https://github.com/unshackle-dl/unshackle) is Python and GPL-3.0,
 > this fork is TypeScript and MIT. Nothing was copied: the console layer and the

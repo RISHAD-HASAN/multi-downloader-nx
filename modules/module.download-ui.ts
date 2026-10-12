@@ -125,6 +125,11 @@ class DownloadSession {
 		});
 	}
 
+	// Last state reported for a track (introspection for callers and tests)
+	stateOf(key: string): TrackState | undefined {
+		return this.runtime.get(key)?.state;
+	}
+
 	stop() {
 		if (this.stopped) return;
 		this.stopped = true;
@@ -133,6 +138,18 @@ class DownloadSession {
 }
 
 let current: DownloadSession | undefined;
+// Every session has an id: work queued for one episode (a decrypt or a mux) can
+// outlive its own view and must not paint the rows of the next episode, which
+// uses the same track keys.
+let currentId = 0;
+
+/**
+ * Identity of the live view, or 0 when there is none. Capture it while an episode
+ * is downloading to report that episode's state from later work.
+ */
+export function sessionToken(): number {
+	return current ? currentId : 0;
+}
 
 /**
  * Begin the live download view. No-op in GUI mode, where the GUI reports its own
@@ -142,6 +159,7 @@ export function beginSession(tracks: UITrack[]): void {
 	endSession();
 	if (process.env.isGUI === 'true') return;
 	if (!tracks.length) return;
+	currentId++;
 	current = new DownloadSession(tracks);
 }
 
@@ -158,8 +176,19 @@ export function trackProgress(key: string, patch: { completed?: number; total?: 
 	current?.progress(key, patch);
 }
 
-export function trackState(key: string, state: TrackState): void {
+/**
+ * Mark a track's terminal state. A `token` from sessionToken() limits the update
+ * to the session that queued the work: a deferred decrypt reports into its own
+ * episode's view while it is still on screen, and stays quiet once it is gone.
+ */
+export function trackState(key: string, state: TrackState, token?: number): void {
+	if (token !== undefined && token !== sessionToken()) return;
 	current?.state(key, state);
+}
+
+// The state a track currently shows, or undefined when the view is gone
+export function trackStateOf(key: string): TrackState | undefined {
+	return current?.stateOf(key);
 }
 
 // Add a track to the running session (2nd dub, subtitles, ...)

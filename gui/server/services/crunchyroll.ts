@@ -131,6 +131,9 @@ class CrunchyHandler extends Base implements MessageHandler {
 		} else {
 			this.alertError(res.reason);
 		}
+		// The episodes are queued through the same tail queue as the CLI: do not
+		// report the download as finished while decrypts or muxes are still running.
+		await this.crunchy.drainTail();
 		this.sendMessage({ name: 'finish', data: undefined });
 		this.setDownloading(false);
 		this.onFinish();

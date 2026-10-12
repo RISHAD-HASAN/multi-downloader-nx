@@ -180,7 +180,21 @@ function testCrunchyWiring() {
 	const source = fs.readFileSync(path.join(__dirname, '..', 'crunchy.ts'), 'utf8');
 	assert.ok(source.includes('private pendingDashTransfers = new DashTransferRegistry();'), 'crunchy.ts must own a DASH transfer registry');
 	assert.ok(source.includes('videoJobs.push(videoJob)'), 'video must run independently of the dub loop');
-	assert.ok(source.includes("await finishTrack('audio');"), 'audio must decrypt inside its own transfer');
+	assert.ok(source.includes("planTrack('video');") && source.includes("planTrack('audio');"), 'each track must queue its own decrypt from inside its own transfer');
+	assert.ok(source.includes('private tailQueue = new TailQueue();'), 'crunchy.ts must own the queue for post-download work');
+	assert.ok(source.includes('this.tailQueue.enqueue(`decrypt ${kind} ('), 'the decrypt must be queued, not run inline');
+	assert.ok(
+		source.includes('this.decryptTrack(kind, trackKey, input, output, destination, keys, Boolean(options.nocleanup), session)'),
+		'the queued decrypt must hand off to decryptTrack with its owning view'
+	);
+	assert.ok(source.includes('this.tailQueue.enqueue(`mux ${path.basename'), 'the mux must be queued behind its own decrypts');
+	assert.ok(!source.includes('await this.muxStreams(res.data'), 'the episode loop must not wait for the mux of the previous episode');
+	assert.ok(source.includes('await this.drainTail();'), 'cli() must drain the tail queue before the run is over');
+	assert.ok(source.includes('this.tailQueue.enqueue(`archive '), 'the archive mark must wait for the episode tail');
+	assert.ok(
+		source.includes('plannedTracks.some((planned) => !res.data.some((file) => file.path === planned))'),
+		'an episode whose track failed after download must not be archived'
+	);
 	assert.ok(source.includes('await Promise.all(videoJobs);'), 'video jobs must drain before returning');
 	assert.ok(source.includes('await Helper.decrypt(binary, args);'), 'decryption must not block network transfers');
 	assert.ok(

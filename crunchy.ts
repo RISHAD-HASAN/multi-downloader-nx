@@ -18,7 +18,7 @@ import * as yamlCfg from './modules/module.cfg-loader';
 import * as yargs from './modules/module.app-args';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
 import { canDecrypt, getKeysPRD, getKeysWVD, cdm } from './modules/cdm';
-import { addTrack, beginSession, endSession, sessionActive, trackState, trackStateAll, type UITrack } from './modules/module.download-ui';
+import { addTrack, beginSession, endSession, sessionActive, sessionToken, trackState, trackStateAll, type UITrack } from './modules/module.download-ui';
 import { block, console_ as richConsole, tracksTree } from './modules/module.console';
 
 // load req
@@ -49,6 +49,7 @@ import {
 	type StreamVariant
 } from './modules/module.crunchy-quality';
 import { applyActualAudioTag, audioTagNotice, DashTransferRegistry, type DashTransferTask } from './modules/module.crunchy-transfer';
+import { TailQueue, describeTailFailure } from './modules/module.tail-queue';
 import { AndroidObject, CrunchyMVObject } from './@types/crunchyAndroidObject';
 
 function normalizedSeasonNumber(title: string | undefined, value: number | string | undefined): number {
@@ -92,6 +93,9 @@ export default class Crunchy implements ServiceClass {
 	// In-flight DASH transfers: video and every audio dub go to separate files,
 	// so they run as one concurrent batch.
 	private pendingDashTransfers = new DashTransferRegistry();
+	// Decrypt + mux of finished episodes: this runs behind the next episode's
+	// download instead of blocking it (see modules/module.tail-queue.ts).
+	private tailQueue = new TailQueue();
 
 	constructor(private debug = false) {
 		this.cfg = yamlCfg.loadCfg();
@@ -110,6 +114,15 @@ export default class Crunchy implements ServiceClass {
 	}
 
 	public async cli() {
+		try {
+			return await this.cliFlow();
+		} finally {
+			// The run is not over until the queued decrypt/mux work has drained.
+			await this.drainTail();
+		}
+	}
+
+	private async cliFlow() {
 		console.info(`\n=== Multi Downloader NX ${packageJson.version} ===\n`);
 		const argv = yargs.appArgv(this.cfg.cli);
 		this.locale = argv.locale;
@@ -1265,36 +1278,110 @@ export default class Crunchy implements ServiceClass {
 		return { isOk: true, value: selectedMedia };
 	}
 
+	/**
+	 * Decrypt one finished track and put it in place. Runs on the tail queue, so the
+	 * multi-GB read/write pass happens while the next episode downloads.
+	 */
+	private async decryptTrack(
+		kind: 'video' | 'audio',
+		trackKey: string,
+		input: string,
+		output: string,
+		destination: string,
+		keys: { kid: string; key: string }[] | undefined,
+		keepEncrypted: boolean,
+		// Owning view, so a late decrypt cannot report into another episode's rows
+		session: number
+	) {
+		trackState(trackKey, 'Decrypting', session);
+		const binary = this.cfg.bin.shaka || this.cfg.bin.mp4decrypt;
+		if (!binary) throw new Error('mp4decrypt/shaka not found; encrypted file retained');
+		const args = this.cfg.bin.shaka
+			? [
+					`input=${input},stream=${kind},output=${output}`,
+					'--enable_raw_key_decryption',
+					'--keys',
+					(keys || []).map((k, i) => `label=KEY${i + 1}:key_id=${k.kid}:key=${k.key}`).join(',')
+				]
+			: [...(keys || []).flatMap((k) => ['--key', `${k.kid}:${k.key}`]), input, output];
+		const decryptStarted = Date.now();
+		try {
+			await Helper.decrypt(binary, args);
+		} catch (error) {
+			// Do not keep a half-decrypted file next to the real output
+			try {
+				fs.rmSync(output, { force: true });
+			} catch {
+				/* the encrypted temp stays for inspection */
+			}
+			throw error;
+		}
+		// A rename puts the finished track in place: copying the decrypted bytes
+		// again would double the disk writes.
+		Helper.moveFile(output, destination);
+		if (!keepEncrypted) fs.unlinkSync(input);
+		trackState(trackKey, 'Decrypted', session);
+		console.debug(`Decrypted ${kind} in ${Helper.formatTime((Date.now() - decryptStarted) / 1000)}`);
+	}
+
+	/**
+	 * Wait for the queued decrypt/mux work and report what failed. cli() calls this
+	 * when the run is over; the GUI handler calls it once its episodes are done.
+	 */
+	public async drainTail() {
+		const failures = await this.tailQueue.drain();
+		if (!failures.length) return;
+		console.error(`[MDNX] ${failures.length} background task(s) failed:`);
+		for (const failure of failures) console.error(`[MDNX]   ${describeTailFailure(failure)}`);
+		// A failed episode must be visible to scripts, not only to a reader. The GUI
+		// server reports through its own channel and must not inherit an exit code.
+		if (process.env.isGUI !== 'true') process.exitCode = 1;
+	}
+
 	public async downloadEpisode(data: CrunchyEpMeta, options: CrunchyDownloadOptions, isSeries?: boolean): Promise<boolean> {
 		const res = await this.downloadMediaList(data, options);
 		if (res === undefined || res.error) {
 			return false;
 		} else {
 			if (options.listFormats || options.F) return true;
+			// Tracks that were planned when the download ended; a decrypt that fails in the
+			// tail drops its entry from files, which is what the archive mark below checks.
+			const plannedTracks = res.data.map((file) => file.path);
 			if (!options.skipmux) {
-				await this.muxStreams(res.data, { ...options, output: res.fileName });
+				// Queued, not awaited: the next episode starts downloading while this one is
+				// still being muxed. Queue order keeps the mux behind its own decrypts.
+				this.tailQueue.enqueue(`mux ${path.basename(res.fileName || 'episode')}`, () => this.muxStreams(res.data, { ...options, output: res.fileName }));
 			} else {
 				console.info('Skipping mux');
 			}
-			if (!isSeries) {
-				downloaded(
-					{
-						service: 'crunchy',
-						type: 's'
-					},
-					data.seasonID,
-					[data.e]
-				);
-			} else {
-				downloaded(
-					{
-						service: 'crunchy',
-						type: 'srz'
-					},
-					data.showID,
-					[data.e]
-				);
-			}
+			// The archive only records an episode whose tail made it: a decrypt failure drops
+			// the track from the mux input, and a later --downloadArchive run has to still see
+			// the episode as missing instead of skipping it forever.
+			this.tailQueue.enqueue(`archive ${path.basename(res.fileName || 'episode')}`, () => {
+				if (plannedTracks.some((planned) => !res.data.some((file) => file.path === planned))) {
+					console.warn(`[MDNX] ${path.basename(res.fileName || 'episode')}: not recorded in the download archive, a track failed after download`);
+					return;
+				}
+				if (!isSeries) {
+					downloaded(
+						{
+							service: 'crunchy',
+							type: 's'
+						},
+						data.seasonID,
+						[data.e]
+					);
+				} else {
+					downloaded(
+						{
+							service: 'crunchy',
+							type: 'srz'
+						},
+						data.showID,
+						[data.e]
+					);
+				}
+			});
 		}
 		return true;
 	}
@@ -2481,45 +2568,32 @@ export default class Crunchy implements ServiceClass {
 							}
 
 							// Finalize each track independently; a sibling failure must not prevent decryption.
-							const finishTrack = async (kind: 'video' | 'audio') => {
+							// The decrypt itself goes on the tail queue: it runs while the next episode
+							// downloads instead of blocking this one.
+							const planTrack = (kind: 'video' | 'audio') => {
 								const segments = kind === 'video' ? chosenVideoSegments : chosenAudioSegments;
 								const keys = kind === 'video' ? encryptionKeysVideo : encryptionKeysAudio;
 								const trackKey = kind === 'video' ? 'video' : audioTrackKey;
 								const destination = `${tsFile}.${kind}.m4s`;
-								if (segments.pssh_wvd || segments.pssh_prd) {
-									trackState(trackKey, 'Decrypting');
-									const input = `${tempTsFile}.${kind}.enc.m4s`;
-									const output = `${tempTsFile}.${kind}.m4s`;
-									const binary = this.cfg.bin.shaka || this.cfg.bin.mp4decrypt;
-									if (!binary) throw new Error('mp4decrypt/shaka not found; encrypted file retained');
-									const args = this.cfg.bin.shaka
-										? [
-												`input=${input},stream=${kind},output=${output}`,
-												'--enable_raw_key_decryption',
-												'--keys',
-												(keys || []).map((k, i) => `label=KEY${i + 1}:key_id=${k.kid}:key=${k.key}`).join(',')
-											]
-										: [...(keys || []).flatMap((k) => ['--key', `${k.kid}:${k.key}`]), input, output];
-									const decryptStarted = Date.now();
+								files.push({ type: kind === 'video' ? 'Video' : 'Audio', path: destination, lang, isPrimary });
+								if (!segments.pssh_wvd && !segments.pssh_prd) return;
+								const input = `${tempTsFile}.${kind}.enc.m4s`;
+								const output = `${tempTsFile}.${kind}.m4s`;
+								// The view that owns this row is the one running now, not whichever
+								// episode happens to be on screen when the queue gets to this task.
+								const session = sessionToken();
+								this.tailQueue.enqueue(`decrypt ${kind} (${path.basename(destination)})`, async () => {
 									try {
-										await Helper.decrypt(binary, args);
+										await this.decryptTrack(kind, trackKey, input, output, destination, keys, Boolean(options.nocleanup), session);
 									} catch (error) {
-										// Do not keep a half-decrypted file next to the real output
-										try {
-											fs.rmSync(output, { force: true });
-										} catch {
-											/* the encrypted temp stays for inspection */
-										}
+										// A mux must not consume a track that never arrived: drop the entry so
+										// muxStreams reports the missing track instead of a bogus merge failure.
+										const at = files.findIndex((file) => file.path === destination);
+										if (at !== -1) files.splice(at, 1);
+										trackState(trackKey, 'FAILED', session);
 										throw error;
 									}
-									// A rename puts the finished track in place: copying the
-									// decrypted bytes again would double the disk writes.
-									Helper.moveFile(output, destination);
-									if (!options.nocleanup) fs.unlinkSync(input);
-									trackState(trackKey, 'Decrypted');
-									console.debug(`Decrypted ${kind} in ${Helper.formatTime((Date.now() - decryptStarted) / 1000)}`);
-								}
-								files.push({ type: kind === 'video' ? 'Video' : 'Audio', path: destination, lang, isPrimary });
+								});
 							};
 
 							const transferMediaId = currentVersion ? currentVersion.guid : currentMediaId;
@@ -2575,7 +2649,7 @@ export default class Crunchy implements ServiceClass {
 									trackState('video', 'Downloaded');
 								}
 								if (!videoDownload.ok) throw new Error('Video download failed');
-								await finishTrack('video');
+								planTrack('video');
 							};
 
 							const transferAudioDash = async () => {
@@ -2621,7 +2695,7 @@ export default class Crunchy implements ServiceClass {
 									trackState(audioTrackKey, 'Downloaded');
 								}
 								if (!audioDownload.ok) throw new Error('Audio download failed');
-								await finishTrack('audio');
+								planTrack('audio');
 							};
 
 							const wantAudioTransfer = Boolean(chosenAudioSegments) && !options.noaudio;
