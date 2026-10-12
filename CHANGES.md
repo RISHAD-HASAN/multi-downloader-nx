@@ -6,6 +6,34 @@ Two things drove this fork: CLI output that reads like a progress UI instead of 
 wall of log lines, and content keys cached so re-downloading an episode does not
 hit the licence server again. The rest is fixes for what broke along the way.
 
+## Naming and speed (2026-10-12)
+
+- **No more `Episode.N` in filenames.** When an episode has no real title the
+  APIs hand back a bare placeholder (`Episode 1`, localized: Épisode, Episodio,
+  Episódio, Folge, 第12話), which used to land verbatim in `${title}`:
+  `Show.S01E01.Episode.1.1080p.CR...`. `Helper.episodeTitleForFilename` now
+  empties those placeholders before the template is filled, so the name comes
+  out `Show.S01E01.1080p.CR...` - parseFileName squeezes the dots the empty slot
+  leaves behind. Real titles survive untouched (only exact bare placeholders
+  match; `Episode 1: The Beginning` is a title), and listings still display the
+  raw title.
+- **Proxy connections are reused.** `Req.getData` built a new `ProxyAgent` per
+  request, so with `--proxy` set every segment download paid a fresh connection
+  and keep-alive never happened. Agents are now cached per proxy URI.
+- **Series listings fetch concurrently.** `listSeriesID` walked seasons one by
+  one, and each `getSeasonDataById` walked its CMS and content-API episode
+  requests one by one - a 10-season show paid ~30 serial round trips before the
+  episode list rendered. Seasons and their endpoint pairs now go out with
+  `Promise.all` and merge in the original order, so the list, its ordering and
+  the dub sorting are byte-for-byte what the serial path produced. HIDIVE's
+  `listSeries` does the same: seasons and their cursor-bound page walks are
+  fetched concurrently, then printed and subtitle-sampled in the original order.
+- **Subtitles no longer download one at a time.** Crunchyroll and HIDIVE fetched
+  every subtitle track sequentially (10-20 serial round trips with `--dlsubs
+  all`). The responses are requested concurrently up front; the existing loop
+  still converts and writes them in the original order, so files and log output
+  are unchanged.
+
 > [unshackle](https://github.com/unshackle-dl/unshackle) is Python and GPL-3.0,
 > this fork is TypeScript and MIT. Nothing was copied: the console layer and the
 > vaults are independent reimplementations of the same ideas. Check the licensing
