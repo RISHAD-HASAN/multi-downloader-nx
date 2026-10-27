@@ -185,7 +185,11 @@ export class JSONVault extends Vault {
 	private save() {
 		const dir = path.dirname(this.filePath);
 		if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-		fs.writeFileSync(this.filePath, JSON.stringify(this.load(), null, '\t'));
+		// Write to a sibling and rename into place: a crash or a full disk half
+		// way through a write must not truncate every cached key of every service.
+		const tmp = `${this.filePath}.tmp`;
+		fs.writeFileSync(tmp, JSON.stringify(this.load(), null, '\t'));
+		fs.renameSync(tmp, this.filePath);
 	}
 
 	private bucket(service: string): Record<string, string> {

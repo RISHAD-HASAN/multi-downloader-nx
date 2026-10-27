@@ -12,8 +12,10 @@ import { convertChaptersToFFmpegFormat } from './module.ffmpegChapter';
 import { mediaInfoFactory } from 'mediainfo.js';
 
 //For signSubsForced input
-import { appArgv } from './module.app-args';
-const argv = appArgv({});
+// Read the parsed options lazily: calling appArgv() here would cache an empty
+// config process-wide and discard config/cli-defaults.yml (see argvView).
+import { argvView } from './module.app-args';
+const argv = argvView();
 
 export type MergerInput = {
 	path: string;
@@ -66,8 +68,9 @@ export type MergerOptions = {
 
 class Merger {
 	constructor(private options: MergerOptions) {
-		//this.options.signSubsForced ??= 'no'; // Default to 'no' if undefined.
-		this.options.signSubsForced = argv.signSubsForced;
+		// Only fill in what the caller left out, so a Merger built with an explicit
+		// signSubsForced keeps it instead of being reset to the CLI default.
+		this.options.signSubsForced ??= argv.signSubsForced ?? 'no';
 		if (this.options.skipSubMux) this.options.subtitles = [];
 		if (this.options.videoTitle) this.options.videoTitle = this.options.videoTitle.replace(/"/g, "'");
 	}

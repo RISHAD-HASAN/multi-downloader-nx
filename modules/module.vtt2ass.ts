@@ -2,8 +2,10 @@
 const cssPrefixRx = /\.rmp-container>\.rmp-content>\.rmp-cc-area>\.rmp-cc-container>\.rmp-cc-display>\.rmp-cc-cue /g;
 
 import { console } from './log';
-import { appArgv } from './module.app-args';
-const argv = appArgv({});
+import { argvView } from './module.app-args';
+// Lazy view: appArgv() here would cache an empty config process-wide and discard
+// config/cli-defaults.yml (see argvView).
+const argv = argvView();
 
 // colors
 import colors from './module.colors.json';

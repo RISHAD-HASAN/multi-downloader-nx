@@ -56,7 +56,10 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 'url',
 		alias: 'u',
 		describe: 'Set the URL to download from (automatically selects service and target ID)',
-		docDescribe: 'Provide a series, season, or episode URL from Crunchyroll, HiDive, or ADN.' + '\nThe service and target IDs are automatically resolved.',
+		docDescribe:
+			'Provide a series, season, or episode URL and the service, target type and ID are resolved from it.' +
+			'\nSupported hosts: crunchyroll.com, hidive.com, animationdigitalnetwork.fr/.com and adn.fr.' +
+			'\nThe scheme may be omitted. An unrecognised URL is reported and nothing is downloaded.',
 		group: 'dl',
 		service: ['all'],
 		type: 'string',
@@ -261,7 +264,9 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 'list-formats',
 		alias: 'F',
 		describe: 'List all available video and audio formats/qualities and exit without downloading',
-		docDescribe: 'List all available video and audio formats/qualities with their resolution, bitrate, and codec, then exit without downloading.',
+		docDescribe:
+			'Show the available video and audio qualities without downloading, muxing, or recording the episode in the download archive.' +
+			'\nCrunchyroll also lists subtitles and estimated video sizes. An episode/season ID is still required.',
 		group: 'dl',
 		service: ['all'],
 		type: 'boolean',
@@ -380,8 +385,11 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 	{
 		name: 'majin',
 		group: 'dl',
-		describe: 'Enable Majin quality mode which transforms stream URLs for higher quality CENC DASH streams.',
-		docDescribe: true,
+		describe: "Force Crunchyroll's Majin VBR DASH encode.",
+		docDescribe:
+			"Force Crunchyroll's Majin VBR DASH encode." +
+			'\nIf it does not exist for a particular dub, that dub falls back to the original stream.' +
+			'\nWithout an override, the downloader automatically compares Majin, CBR 0 and CBR 1.',
 		service: ['crunchy'],
 		type: 'boolean',
 		usage: '',
@@ -393,7 +401,10 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 'cbr',
 		group: 'dl',
 		describe: 'Force a CBR stream instead of auto-comparison (0 = high bitrate, 1 = standard). Takes priority over --majin.',
-		docDescribe: true,
+		docDescribe:
+			'Force CBR 0 (high-bitrate) or CBR 1 (standard) instead of the automatic stream comparison; takes precedence over --majin.' +
+			'\nAn unavailable encode falls back to the original stream.' +
+			'\nWhere a complete video file is accessible, its measured bitrate is shown; otherwise file sizes are estimates based on manifest bitrate and duration.',
 		service: ['crunchy'],
 		type: 'string',
 		choices: ['0', '1'],
@@ -746,7 +757,14 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		describe: `Set the filename template. Use \${variable_name} to insert variables.\nYou can also create folders by inserting a path seperator in the filename\nYou may use ${availableFilenameVars
 			.map((a) => `'${a}'`)
 			.join(', ')} as variables.`,
-		docDescribe: true,
+		docDescribe:
+			`Set the filename template. Use \${variable_name} to insert variables.` +
+			'\nYou can also create folders by inserting a path seperator in the filename' +
+			`\nYou may use ${'${audio}'} to insert the DUAL tag.` +
+			`\n\n${'${audio}'} expands to \`DUAL.\` when more than one audio dub actually finished downloading, and to an empty` +
+			`\nstring otherwise. It only ends up in the filename when the template contains it, so a template without` +
+			`\n${'${audio}'} cannot show the tag - the downloader prints a warning when two dubs completed but the template` +
+			'\nhas nowhere to put it.',
 		service: ['all'],
 		type: 'string',
 		usage: '${fileName}',

@@ -1035,7 +1035,7 @@ export default class Hidive implements ServiceClass {
 							if (!options.nocleanup) {
 								fs.unlinkSync(`${tempTsFile}.video.enc.m4s`);
 							}
-							Helper.moveFile(`${tempTsFile}.video.m4s`, `${tsFile}.video.m4s`);
+							await Helper.moveFile(`${tempTsFile}.video.m4s`, `${tsFile}.video.m4s`);
 							videoFiles.push({
 								type: 'Video',
 								path: `${tsFile}.video.m4s`,
@@ -1133,7 +1133,7 @@ export default class Hidive implements ServiceClass {
 							if (!options.nocleanup) {
 								fs.unlinkSync(`${tempTsFile}.audio.enc.m4s`);
 							}
-							Helper.moveFile(`${tempTsFile}.audio.m4s`, `${tsFile}.audio.m4s`);
+							await Helper.moveFile(`${tempTsFile}.audio.m4s`, `${tsFile}.audio.m4s`);
 							audioFiles[audioIndex] = [
 								{
 									type: 'Audio',

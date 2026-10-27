@@ -118,6 +118,19 @@ export let argvC: {
 
 export type ArgvType = typeof argvC;
 
+/**
+ * A side-effect-free, lazy view of the parsed options.
+ *
+ * `appArgv()` caches its first result process-wide, so calling it with an empty
+ * config from module scope freezes the built-in defaults and silently discards
+ * every key in `config/cli-defaults.yml` for the rest of the process. Modules
+ * that only read a value while the program is running must use this instead.
+ */
+export const argvView = (): ArgvType =>
+	new Proxy({} as ArgvType, {
+		get: (_target, key) => (argvC as unknown as Record<string | symbol, unknown> | undefined)?.[key]
+	});
+
 const syncArgAliases = (parsed: ArgvType): void => {
 	for (const item of args) {
 		const camel = item.name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());

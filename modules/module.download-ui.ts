@@ -211,12 +211,16 @@ export function endSession(): void {
 }
 
 // Never leave the terminal with a hidden cursor or a half-painted live region.
-for (const sig of ['SIGINT', 'SIGTERM'] as const) {
-	process.on(sig, () => {
-		endSession();
-		console_.showCursor();
-		process.exit(130);
-	});
+// The GUI server runs in the same process and owns its own shutdown, so it must
+// not be killed here - there is no live view to tear down in that mode anyway.
+if (process.env.isGUI !== 'true') {
+	for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+		process.on(sig, () => {
+			endSession();
+			console_.showCursor();
+			process.exit(130);
+		});
+	}
 }
 process.on('exit', () => {
 	endSession();

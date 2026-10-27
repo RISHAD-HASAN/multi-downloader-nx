@@ -141,8 +141,9 @@ import path from 'node:path';
 			assert.equal(missingBin.isOk, false, 'a binary that cannot be spawned must resolve as a failure');
 
 			// Moving a finished track must put it in place and leave nothing behind.
+			// Async, so a cross-device copy cannot block the event loop.
 			const moved = path.join(execTemp, 'moved.txt');
-			Helper.moveFile(output, moved);
+			await Helper.moveFile(output, moved);
 			assert.equal(fs.readFileSync(moved, 'utf8'), 'async argument');
 			assert.equal(fs.existsSync(output), false, 'a rename must not leave the source behind');
 		} finally {

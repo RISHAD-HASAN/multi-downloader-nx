@@ -1,0 +1,97 @@
+name: CI
+
+on:
+    push:
+        branches: ['**']
+    pull_request:
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    # pnpm prints a warning and prompts on some CI setups otherwise
+    CI: true
+
+jobs:
+    quality:
+        name: Typecheck, lint, format
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Typecheck
+              run: pnpm exec tsc --noEmit
+
+            - name: ESLint
+              run: pnpm run eslint
+
+            - name: Prettier
+              run: pnpm run prettier
+
+    test:
+        name: Tests (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-latest]
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            # tests/run.ts discovers every tests/*.test.ts and gives each its own
+            # process, so new test files are picked up without touching package.json.
+            - name: Run tests
+              run: pnpm test
+
+    docs:
+        name: Docs are in sync with module.args.ts
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            # docs/DOCUMENTATION.md is generated from modules/module.args.ts. It drifted
+            # badly (the header still said v5.8.2 while the CLI shipped --url, --majin
+            # and --cbr), so this fails instead of letting it drift again.
+            - name: Regenerate documentation
+              run: pnpm run docs
+
+            - name: Fail if the committed documentation is stale
+              run: git diff --exit-code -- docs/DOCUMENTATION.md
