@@ -1318,7 +1318,7 @@ export default class Crunchy implements ServiceClass {
 		}
 		// A rename puts the finished track in place: copying the decrypted bytes
 		// again would double the disk writes.
-		Helper.moveFile(output, destination);
+		await Helper.moveFile(output, destination);
 		if (!keepEncrypted) fs.unlinkSync(input);
 		trackState(trackKey, 'Decrypted', session);
 		console.debug(`Decrypted ${kind} in ${Helper.formatTime((Date.now() - decryptStarted) / 1000)}`);

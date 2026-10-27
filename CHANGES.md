@@ -6,6 +6,84 @@ Two things drove this fork: CLI output that reads like a progress UI instead of 
 wall of log lines, and content keys cached so re-downloading an episode does not
 hit the licence server again. The rest is fixes for what broke along the way.
 
+## Upstream sync, CI and fixes (2026-10-27)
+
+- **Synced with upstream v5.8.6.** `modules/module.api-urls.ts` still carried the
+  v5.8.5 Crunchyroll credentials. Upstream rotates the anonymous-session token and
+  the pinned device UA roughly monthly (`8599faa`, 2026-10-23); both are updated
+  to `Crunchyroll/ANDROIDTV/3.76.0_22366`. Every other commit upstream made since
+  this fork's base (`5021398`) was already merged - this was the only gap. Version
+  bumped to 5.8.6 to match.
+- **A SOCKS `--proxy` is no longer silently ignored.** `Req.isValidProxyUrl()`
+  whitelisted `socks4`/`socks5` in its regex and then rejected anything that was
+  not `http:`/`https:`, so `socks5://…` fell through to a direct connection with a
+  one-line warning that repeated on every single request. For a tool whose proxy
+  setting exists to defeat geo-blocking, going out over the real connection while
+  looking configured is the worst possible outcome. `--proxy` is now classified
+  once, up front (`checkProxyUrl`), and a SOCKS URI is reported loudly with a
+  pointer to bridging it to HTTP. Undici cannot drive SOCKS, so this is a clear
+  error rather than a silent downgrade.
+- **`config/cli-defaults.yml` can no longer be lost to import order.**
+  `module.merger`, `module.vtt2ass` and `module.vttconvert` each called
+  `appArgv({})` at module scope, and `appArgv()` caches its first result
+  process-wide. Whichever module loaded first decided the options for the whole
+  process: importing `module.merger` before anything discarded every key in
+  `cli-defaults.yml` (`--partsize` fell back to 10 instead of 20, `--fileName` to
+  the built-in template). It only worked because `hls-download` happens to build a
+  `Req` earlier. All three now use `argvView()`, a lazy proxy over the parsed
+  options with no side effect.
+- **`Merger` keeps the `signSubsForced` it is given.** The constructor overwrote
+  the caller's option with the module-load-time argv, so
+  `new Merger({ signSubsForced: 'yes' })` silently became `'no'`.
+- **An empty `bin-path.yml` entry disables the tool** (upstream `cf585b51`,
+  v5.8.5). `ffmpeg: ''` - and the bare `ffmpeg:` that YAML parses as null - used to
+  fall through to the built-in default and re-enable a binary deliberately
+  switched off.
+- **`modules/module.cfg-loader.ts` no longer depends on import order.** It
+  imported `./log` before `./module.working-dir`, and `log.ts` reads the
+  re-exported `workingDir` while its own module body runs - so any entry point
+  that imported the config loader first crashed with
+  `Cannot read properties of undefined (reading 'workingDir')`.
+- **Content keys stay out of `logs/latest.log`.** `Helper.exec`/`execAsync` echo
+  the command line, and HIDIVE's shaka-packager call carries
+  `--keys label=..:key_id=..:key=..`. That is written to disk on `--debug` - the
+  exact file users attach to bug reports. Key material is now redacted, matching
+  what `cekTree()` already did for the UI and `Helper.decrypt()` for arguments.
+- **`Helper.moveFile` is asynchronous.** A cross-device move used
+  `copyFileSync` + `unlinkSync`, blocking the event loop for a multi-GB copy -
+  precisely what the tail queue exists to avoid - and leaving a half-written
+  destination if it failed. It now awaits and cleans up after itself.
+- **`JSONVault` writes atomically**, via a sibling file and rename, so a crash
+  mid-write can no longer truncate every cached key of every service.
+- **Filenames survive `$` in titles.** `parseFileName` passed the substituted
+  value straight to `String.replace`, where `$&`, `` $` `` and `$'` are
+  interpreted; an episode title containing `$&` corrupted the filename.
+- **The GUI is no longer killed by the download view's signal handlers.**
+  `module.download-ui` installed process-wide SIGINT/SIGTERM handlers that called
+  `process.exit(130)`; the GUI server imports `crunchy.ts`, so it never got to
+  shut down cleanly. They are now installed only outside GUI mode.
+
+### Developer experience
+
+- **CI** (`.github/workflows/ci.yml`): typecheck, ESLint, Prettier, the test suite
+  on Linux and Windows, and a job that regenerates `docs/DOCUMENTATION.md` and
+  fails if the committed copy drifted from `modules/module.args.ts`. The repo had
+  14 test files, husky and commitlint, and nothing that ran any of it.
+- **`pnpm test` discovers tests.** `test:all` was a hand-maintained chain of 14
+  commands in `package.json`; `tests/run.ts` globs `tests/*.test.ts`, runs each in
+  its own process and reports a summary. It accepts name filters
+  (`tsx tests/run.ts proxy url`).
+- **New tests:** `tests/url.test.ts` (`-u/--url` had none, despite parsing
+  untrusted input), `tests/proxy.test.ts`, `tests/bin-path-disabled.test.ts`.
+- **Prettier is green**, including `modules/cdm.ts` and
+  `modules/module.api-urls.ts`, which were already failing on `main`.
+- **Documentation is generated again.** `docs/DOCUMENTATION.md` still said
+  "v5.8.2" in its header and was missing `--url`, `--signSubsForced`,
+  `--outputDir`, `--theme` and `--noColor`. The fuller hand-written descriptions
+  for `-F/--list-formats`, `--majin`, `--cbr` and the `${audio}` DUAL tag had been
+  typed straight into the generated file, where every regeneration deletes them;
+  they now live on the arguments in `modules/module.args.ts` where they survive.
+
 ## Naming and speed (2026-10-12)
 
 - **No more `Episode.N` in filenames.** When an episode has no real title the

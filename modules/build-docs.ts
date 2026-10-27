@@ -73,4 +73,53 @@ Object.entries(groups).forEach(([key, value]) => {
 		.join('\n');
 });
 
+// Fork-specific sections. They used to be typed straight into the generated
+// docs/DOCUMENTATION.md, where every run of `pnpm docs` deleted them - so they
+// live here, next to the rest of the generated text.
+docs += `
+---
+
+## Content Key Vaults
+
+A vault caches \`KID -> CONTENT KEY\` pairs per service. When a title is
+re-downloaded - or when another dub or season shares the same keys - aniDL reads
+the key from the vault and never contacts the licence server.
+
+Configure in \`config/vaults.yml\`:
+
+\`\`\`yaml
+enabled: true
+key_vaults:
+  - type: SQLite            # requires Node >= 22.5 (built-in node:sqlite)
+    name: 'Local Vault'
+    path: './config/key_vault.db'
+
+  # - type: JSON            # zero-dependency fallback for older Node
+  #   name: 'Local JSON Vault'
+  #   path: './config/key_vault.json'
+
+  # - type: API             # remote HTTP vault
+  #   name: 'Team Vault'
+  #   uri: 'https://vault.example.com/api'
+  #   token: 'your-secret-key'
+  #   no_push: false        # true = read-only
+\`\`\`
+
+Local vaults are always queried before network vaults. Keys obtained from a
+licence are written back to every vault that does not set \`no_push: true\`.
+
+The schema matches devine's vaults, so \`path\` can point at an existing
+\`key_vault.db\`.
+
+## Console Theming
+
+| Option | Description |
+| ------ | ----------- |
+| \`--theme <name>\` | \`catppuccin-mocha\` (default), \`dracula\`, \`nord\`, \`gruvbox\`, \`one-dark\`, \`mono\` |
+| \`--noColor\` | Disable all colour and styling |
+
+Environment overrides: \`ANIDL_THEME\`, \`ANIDL_NO_COLOR\`, \`ANIDL_LOG_LEVEL\`
+(\`debug\`/\`info\`/\`warning\`/\`error\`).
+`;
+
 fs.writeFileSync(path.resolve(__dirname, '..', 'docs', 'DOCUMENTATION.md'), docs);

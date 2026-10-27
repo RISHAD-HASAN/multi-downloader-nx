@@ -54,13 +54,16 @@ const parseFileName = (input: string, variables: Variable[], numbers: number, ov
 			continue;
 		}
 
+		// Substituted through a function on purpose: values are free text (episode
+		// titles, overrides) and as a plain string `$&`, `$1` and friends in them
+		// would be interpreted and corrupt the filename.
 		if (use.type === 'number') {
 			const len = use.replaceWith.toFixed(0).length;
 			const replaceStr = len < numbers ? '0'.repeat(numbers - len) + use.replaceWith : use.replaceWith + '';
-			input = input.replace(type, replaceStr);
+			input = input.replace(type, () => replaceStr);
 		} else {
 			if (use.sanitize) use.replaceWith = Helper.cleanupFilename(use.replaceWith);
-			input = input.replace(type, use.replaceWith);
+			input = input.replace(type, () => use.replaceWith);
 		}
 	}
 

@@ -3,13 +3,17 @@ import path from 'path';
 import yaml from 'yaml';
 import fs from 'fs';
 import { lookpath } from 'lookpath';
-import { console } from './log';
-import { GuiState } from '../@types/messageHandler';
-import type { VaultConfig } from './module.vault';
-
+// Imported before ./log on purpose: log.ts reads the re-exported workingDir
+// while its own module body runs, so if ./log were loaded first it would pull in
+// this half-initialised module and see `workingDir` as undefined. Any entry
+// point that imports module.cfg-loader before modules/log used to crash here.
 import { workingDir } from './module.working-dir';
 
 export { workingDir };
+
+import { console } from './log';
+import { GuiState } from '../@types/messageHandler';
+import type { VaultConfig } from './module.vault';
 
 const binCfgFile = path.join(workingDir, 'config', 'bin-path');
 const dirCfgFile = path.join(workingDir, 'config', 'dir-path');
@@ -197,6 +201,18 @@ const loadBinCfg = async () => {
 
 	const keys = Object.keys(defaultBin) as (keyof typeof defaultBin)[];
 	for (const dir of keys) {
+		// An empty entry disables the tool (upstream v5.8.5). It used to fall
+		// through to the built-in default, which silently re-enabled a binary the
+		// user had deliberately blanked out. `ffmpeg:` in YAML parses as null,
+		// `ffmpeg: ''` as an empty string - both mean "off".
+		if (Object.prototype.hasOwnProperty.call(binCfg, dir)) {
+			const value = binCfg[dir];
+			if (value === null || (typeof value === 'string' && value.trim() === '')) {
+				binCfg[dir] = undefined;
+				continue;
+			}
+		}
+
 		// 1. Look for specific environment variable for this binary
 		let envBinary: string | undefined;
 		for (const envKey of binEnvMap[dir]) {

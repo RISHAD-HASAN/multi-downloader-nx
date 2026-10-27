@@ -1,6 +1,8 @@
 //For ScaledBorderAndShadow input
-import { appArgv } from './module.app-args';
-const argv = appArgv({});
+// Lazy view: appArgv() here would cache an empty config process-wide and discard
+// config/cli-defaults.yml (see argvView).
+import { argvView } from './module.app-args';
+const argv = argvView();
 
 // vtt loader
 export type Record = {

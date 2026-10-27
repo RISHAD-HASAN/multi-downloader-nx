@@ -9,6 +9,22 @@ import { console } from './log';
 // Subprocess output is hidden unless the user asked for --debug
 const quietDefault = () => richConsole.level !== 'debug' && process.env.isGUI !== 'true';
 
+// A decrypt command line carries the content keys in plain text: mp4decrypt takes
+// `--key <kid>:<key>` and shaka-packager `--keys label=..:key_id=..:key=..`.
+// cekTree() masks them in the UI and Helper.decrypt() never echoes its arguments,
+// so the command printed here has to be masked as well - on --debug it is written
+// to logs/latest.log, which is exactly the file users attach to bug reports.
+const KID_KEY_PAIR = /^[0-9a-f]{16,}:[0-9a-f]{16,}$/i;
+
+const redactKeyMaterial = (arg: string, index: number, argv: string[]): string => {
+	// mp4decrypt: `--key <kid>:<key>`, or `--key <key>` on its own
+	if (index > 0 && /^--keys?$/i.test(argv[index - 1])) return '<content key>';
+	// shaka-packager value: `label=..:key_id=<kid>:key=<key>`
+	if (KID_KEY_PAIR.test(arg)) return '<content key>';
+	if (/^--keys?=/i.test(arg)) return arg.replace(/=.*$/, '=<content key>');
+	return arg.replace(/((?:key_id|key)=)[0-9a-f]+/gi, '$1<content key>');
+};
+
 export type ExecResult =
 	| {
 			isOk: true;
@@ -44,7 +60,10 @@ export default class Helper {
 		return new Promise((resolve) => {
 			const argv = Array.isArray(pargs) ? pargs : Helper.splitArguments(pargs);
 			const command = fpath.trim().replace(/^["']|["']$/g, '');
-			const display = argv.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg)).join(' ');
+			const display = argv
+				.map(redactKeyMaterial)
+				.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg))
+				.join(' ');
 			if (quiet) console.debug(`> "${pname}" ${display}`);
 			else console.info(`\n> "${pname}" ${display}${spc ? '\n' : ''}`);
 			const child = childProcess.spawn(command, argv, { stdio: quiet ? 'pipe' : 'inherit', windowsHide: true });
@@ -78,15 +97,25 @@ export default class Helper {
 	/**
 	 * Move a finished file into place. A rename is instant on the same volume;
 	 * only a cross-device move falls back to copying the bytes again.
+	 *
+	 * Asynchronous throughout: copying a multi-GB file must not block the event
+	 * loop, which is the whole point of the tail queue and execAsync. A copy that
+	 * dies half way leaves no partial file at the destination.
 	 */
-	static moveFile(from: string, to: string): void {
+	static async moveFile(from: string, to: string): Promise<void> {
 		try {
-			fs.renameSync(from, to);
+			await fs.promises.rename(from, to);
+			return;
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
-			fs.copyFileSync(from, to);
-			fs.unlinkSync(from);
 		}
+		try {
+			await fs.promises.copyFile(from, to);
+		} catch (error) {
+			await fs.promises.rm(to, { force: true });
+			throw error;
+		}
+		await fs.promises.rm(from, { force: true });
 	}
 
 	/**
@@ -211,7 +240,10 @@ export default class Helper {
 			// passing the resulting arguments through a shell (including on Windows).
 			const argv = Array.isArray(pargs) ? pargs : Helper.splitArguments(pargs);
 			const command = fpath.trim().replace(/^["']|["']$/g, '');
-			const display = argv.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg)).join(' ');
+			const display = argv
+				.map(redactKeyMaterial)
+				.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg))
+				.join(' ');
 			if (quiet) console.debug(`> "${pname}" ${display}`);
 			else console.info(`\n> "${pname}" ${display}${spc ? '\n' : ''}`);
 			const stdio = quiet ? 'pipe' : 'inherit';

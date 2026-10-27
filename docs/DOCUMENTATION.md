@@ -1,4 +1,4 @@
-# multi-downloader-nx (v5.8.2)
+# multi-downloader-nx (v5.8.6)
 
 If you find any bugs in this documentation or in the program itself please report it [over on GitHub](https://github.com/anidl/multi-downloader-nx/issues).
 
@@ -99,6 +99,14 @@ Get last updated series list
 | Crunchyroll | `--absolute ` | `boolean` | `No`| `NaN` | `NaN` |
 
 Use absolute numbers for the episode. If not set, it will use the default index numbers
+#### `--url`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| All | `--url ${url}` | `string` | `No`| `-u` | `NaN` |
+
+Provide a series, season, or episode URL and the service, target type and ID are resolved from it.
+Supported hosts: crunchyroll.com, hidive.com, animationdigitalnetwork.fr/.com and adn.fr.
+The scheme may be omitted. An unrecognised URL is reported and nothing is downloaded.
 #### `--movie-listing`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
@@ -156,6 +164,13 @@ Allows you to download or view legacy Crunchyroll Ids
 | All | `-q ${qualityLevel}` | `number` | `No`| `NaN` | `0`| `q: ` |
 
 Set the quality level. Use 0 to use the maximum quality.
+#### `--list-formats`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| All | `--list-formats ` | `boolean` | `No`| `-F` | `false`| `list-formats: ` |
+
+Show the available video and audio qualities without downloading, muxing, or recording the episode in the download archive.
+Crunchyroll also lists subtitles and estimated video sizes. An episode/season ID is still required.
 #### `--dlVideoOnce`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -208,24 +223,22 @@ Select a specific Crunchyroll video playback endpoint by device. androidtv provi
 | Crunchyroll | `--astream ${device}` | `string` | `No`| `--as` | [`androidtv`, `android`, `androidtab`, `none`] | `android`| `astream: ` |
 
 Select a specific Crunchyroll audio playback endpoint by device. android provides the best audio (192 kbps).
-#### `-F`, `--list-formats`
-| **Service** | **Usage** | **Type** | **Required** | **Alias** |
-| --- | --- | --- | --- | --- |
-| All | `-F` or `--list-formats` | `boolean` | `No` | `-F` |
-
-Show the available video and audio qualities without downloading, muxing, or recording the episode in the download archive. Crunchyroll also lists subtitles and estimated video sizes. An episode/season ID is still required.
 #### `--majin`
-| **Service** | **Usage** | **Type** | **Required** | **Default** |
-| --- | --- | --- | --- | --- |
-| Crunchyroll | `--majin` | `boolean` | `No` | `false` |
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| Crunchyroll | `--majin ` | `boolean` | `No`| `NaN` | `false`| `majin: ` |
 
-Force Crunchyroll's Majin VBR DASH encode. If it does not exist for a particular dub, that dub falls back to the original stream. Without an override, the downloader automatically compares Majin, CBR 0 and CBR 1.
+Force Crunchyroll's Majin VBR DASH encode.
+If it does not exist for a particular dub, that dub falls back to the original stream.
+Without an override, the downloader automatically compares Majin, CBR 0 and CBR 1.
 #### `--cbr`
-| **Service** | **Usage** | **Type** | **Required** | **Default** |
-| --- | --- | --- | --- | --- |
-| Crunchyroll | `--cbr 0` or `--cbr 1` | `string` | `No` | automatic |
+| **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| Crunchyroll | `--cbr [0|1]` | `string` | `No`| `NaN` | [`0`, `1`] | `NaN` |
 
-Force CBR 0 (high-bitrate) or CBR 1 (standard) instead of the automatic stream comparison; takes precedence over `--majin`. An unavailable encode falls back to the original stream. Where a complete video file is accessible, its measured bitrate is shown; otherwise file sizes are estimates based on manifest bitrate and duration.
+Force CBR 0 (high-bitrate) or CBR 1 (standard) instead of the automatic stream comparison; takes precedence over --majin.
+An unavailable encode falls back to the original stream.
+Where a complete video file is accessible, its measured bitrate is shown; otherwise file sizes are estimates based on manifest bitrate and duration.
 #### `--tsd`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -405,6 +418,12 @@ Set the time the downloader waits before retrying if an error while writing the 
 
 If a file already exists, the tool will ask you how to proceed. With this, you can answer in advance.
 ### Muxing
+#### `--signSubsForced`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | --- | ---| 
+| All | `--signSubsForced ` | `string` | `No`| `NaN` | [`yes`, `default`, `no`] | `no`| `signSubsForced: ` |
+
+Set sign subs as forced/default/none
 #### `--mp4`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -489,12 +508,18 @@ Possible Values: und, eng, eng, spa, spa-419, spa-ES, por, por, fra, deu, ara-ME
 
 Set the filename template. Use ${variable_name} to insert variables.
 You can also create folders by inserting a path seperator in the filename
-You may use 'title', 'episode', 'showTitle', 'seriesTitle', 'season', 'width', 'height', 'service', 'audio' as variables.
+You may use ${audio} to insert the DUAL tag.
 
-`${audio}` expands to `DUAL.` when more than one audio dub actually finished downloading, and to an empty
+${audio} expands to `DUAL.` when more than one audio dub actually finished downloading, and to an empty
 string otherwise. It only ends up in the filename when the template contains it, so a template without
-`${audio}` cannot show the tag - the downloader prints a warning when two dubs completed but the template
+${audio} cannot show the tag - the downloader prints a warning when two dubs completed but the template
 has nowhere to put it.
+#### `--outputDir`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| All | `--outputDir ${outputDir}` | `string` | `No`| `NaN` | ``| `outputDir: ` |
+
+Set a custom directory for the final muxed file (supports template variables). Temporary files remain in the default content folder.
 #### `--numbers`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -530,6 +555,19 @@ Reset session cookie for testing purposes
 
 Debug mode (tokens may be revealed in the console output)
 ### Utilities
+#### `--theme`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | --- | ---| 
+| All | `--theme ${theme}` | `string` | `No`| `NaN` | [`catppuccin-mocha`, `dracula`, `nord`, `gruvbox`, `one-dark`, `mono`] | `catppuccin-mocha`| `theme: ` |
+
+Colour palette used by the console renderer.
+Available: catppuccin-mocha, dracula, nord, gruvbox, one-dark, mono.
+#### `--noColor`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| All | `--noColor ` | `boolean` | `No`| `NaN` | `false`| `noColor: ` |
+
+Disable all colour and styling in the console output
 #### `--service`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | --- | ---| 
@@ -624,4 +662,3 @@ The schema matches devine's vaults, so `path` can point at an existing
 
 Environment overrides: `ANIDL_THEME`, `ANIDL_NO_COLOR`, `ANIDL_LOG_LEVEL`
 (`debug`/`info`/`warning`/`error`).
-

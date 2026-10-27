@@ -93,10 +93,50 @@ export type GetDataResponse = {
 // }
 
 // req
+export type ProxyCheck = { ok: true } | { ok: false; kind: 'socks' | 'unsupported' | 'malformed'; detail: string };
+
+/**
+ * Classify a `--proxy` value.
+ *
+ * Undici can only drive an HTTP/HTTPS proxy. A socks:// URI parses fine, so it
+ * used to be accepted by the URL check and then dropped again per request with a
+ * generic "invalid Proxy URL" warning - which left a geo-unblocking run going
+ * out over the real connection while looking configured.
+ */
+export const checkProxyUrl = (uri: string): ProxyCheck => {
+	let parsed: URL;
+	try {
+		parsed = new URL(uri);
+	} catch {
+		return { ok: false, kind: 'malformed', detail: `${uri} is not a valid URL` };
+	}
+
+	if (['socks4:', 'socks5:', 'socks5h:'].includes(parsed.protocol)) {
+		return { ok: false, kind: 'socks', detail: `${uri} is a SOCKS proxy, which the HTTP client cannot use` };
+	}
+
+	if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) {
+		return { ok: false, kind: 'unsupported', detail: `${uri} is not an http:// or https:// proxy URL` };
+	}
+
+	return { ok: true };
+};
+
+// Every Req in the process sees the same --proxy, so report a bad one once.
+const reportedProxies = new Set<string>();
+
+const reportProxyIssue = (uri: string, lines: string[]) => {
+	if (reportedProxies.has(uri)) return;
+	reportedProxies.add(uri);
+	for (const line of lines) console.error(line);
+};
+
 export class Req {
 	private debug: boolean;
 	// Size of this client's HTTP/1.1 pool (see connectionCount)
 	private connections: number;
+	// Resolved once: a bad proxy is reported once per run, not once per request
+	private proxy?: ProxyAgent;
 	public argv: typeof argvC;
 
 	constructor() {
@@ -104,6 +144,26 @@ export class Req {
 		this.argv = yargs.appArgv(cfg.cli, process.env.isGUI ? true : false);
 		this.debug = this.argv.debug ?? false;
 		this.connections = connectionCount(this.argv.partsize);
+		this.proxy = this.resolveProxy();
+	}
+
+	/**
+	 * Build the proxy agent for `--proxy`, or undefined when the setting cannot
+	 * be honoured. Callers fall back to a direct connection, so every rejection
+	 * here has to be loud: a silently unproxied request defeats the point of
+	 * using a proxy in the first place.
+	 */
+	private resolveProxy(): ProxyAgent | undefined {
+		const uri = this.argv.proxy;
+		if (!uri) return undefined;
+
+		const check = checkProxyUrl(uri);
+		if (check.ok) return getProxyAgent(uri, this.connections);
+
+		const lines = [`[Fetch] --proxy ${check.detail}; traffic will NOT be proxied.`];
+		if (check.kind === 'socks') lines.push('[Fetch] Use an http:// or https:// proxy, or bridge SOCKS to HTTP locally (privoxy, ...).');
+		reportProxyIssue(uri, lines);
+		return undefined;
 	}
 
 	async getData(durl: string, params: Partial<RequestInit & CustomParams> = {}): Promise<GetDataResponse> {
@@ -122,11 +182,8 @@ export class Req {
 
 		// Proxy Handler
 		let dispatcher: Agent | ProxyAgent = getHttp1Agent(this.connections);
-		const validProxy = this.argv.proxy ? this.isValidProxyUrl(this.argv.proxy) : false;
-		if ((params.useProxy || this.argv.proxyAll) && this.argv.proxy && validProxy) {
-			dispatcher = getProxyAgent(this.argv.proxy, this.connections);
-		} else if ((params.useProxy || this.argv.proxyAll) && this.argv.proxy && !validProxy) {
-			console.warn('[Fetch] Provided invalid Proxy URL, not proxying traffic.');
+		if ((params.useProxy || this.argv.proxyAll) && this.proxy) {
+			dispatcher = this.proxy;
 		}
 
 		// Debug
@@ -208,30 +265,6 @@ export class Req {
 				ok: false,
 				error
 			};
-		}
-	}
-
-	private isValidProxyUrl(proxyUrl: string): boolean {
-		try {
-			if (!proxyUrl.match(/^(https?|socks4|socks5):\/\//)) {
-				return false;
-			}
-
-			const url = new URL(proxyUrl);
-
-			if (!url.hostname) return false;
-
-			if (!['http:', 'https:'].includes(url.protocol)) {
-				return false;
-			}
-
-			if (url.port && (!/^\d+$/.test(url.port) || Number(url.port) < 1 || Number(url.port) > 65535)) {
-				return false;
-			}
-
-			return true;
-		} catch {
-			return false;
 		}
 	}
 }
