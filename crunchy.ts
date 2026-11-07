@@ -26,7 +26,17 @@ import { domain, api } from './modules/module.api-urls';
 import * as reqModule from './modules/module.fetch';
 import { CrunchySearch } from './@types/crunchySearch';
 import { CrunchyEpisodeList, CrunchyEpisode } from './@types/crunchyEpisodeList';
-import { CrunchyDownloadOptions, CrunchyEpMeta, CrunchyMuxOptions, CrunchyMultiDownload, DownloadedMedia, ParseItem, SeriesSearch, SeriesSearchItem } from './@types/crunchyTypes';
+import {
+	CrunchyDownloadOptions,
+	CrunchyEpMeta,
+	CrunchyMuxOptions,
+	CrunchyMultiDownload,
+	DownloadedMedia,
+	EpisodeVersion,
+	ParseItem,
+	SeriesSearch,
+	SeriesSearchItem
+} from './@types/crunchyTypes';
 import { ObjectInfo } from './@types/objectInfo';
 import parseFileName, { Variable } from './modules/module.filename';
 import { CrunchyStreams, PlaybackData } from './@types/playbackData';
@@ -1349,8 +1359,12 @@ export default class Crunchy implements ServiceClass {
 			const plannedTracks = res.data.map((file) => file.path);
 			if (!options.skipmux) {
 				// Queued, not awaited: the next episode starts downloading while this one is
-				// still being muxed. Queue order keeps the mux behind its own decrypts.
-				this.tailQueue.enqueue(`mux ${path.basename(res.fileName || 'episode')}`, () => this.muxStreams(res.data, { ...options, output: res.fileName }));
+				// still being muxed. Queue order keeps the mux behind its own decrypts;
+				// subtitle fonts download during media transfer/decryption when possible.
+				this.tailQueue.enqueue(`mux ${path.basename(res.fileName || 'episode')}`, async () => {
+					await res.fontsReady;
+					return this.muxStreams(res.data, { ...options, output: res.fileName });
+				});
 			} else {
 				console.info('Skipping mux');
 			}
@@ -1665,9 +1679,7 @@ export default class Crunchy implements ServiceClass {
 		if (!tokens.length) return;
 		await this.refreshToken(true, true);
 		const auth = { headers: { Authorization: `Bearer ${this.token.access_token}`, ...api.crunchyDefHeader }, method: 'DELETE', silent: true } as FetchParams;
-		for (const token of tokens) {
-			await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${contentId}/${token}`, auth);
-		}
+		await Promise.all(tokens.map((token) => this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${contentId}/${token}`, auth)));
 	}
 
 	public async downloadMediaList(
@@ -1678,6 +1690,7 @@ export default class Crunchy implements ServiceClass {
 				data: DownloadedMedia[];
 				fileName: string;
 				error: boolean;
+				fontsReady?: Promise<void>;
 		  }
 		| undefined
 	> {
@@ -1696,6 +1709,22 @@ export default class Crunchy implements ServiceClass {
 		}
 
 		const files: DownloadedMedia[] = [];
+		// Font retrieval is independent of media decryption; start it as soon as a
+		// converted subtitle tells us which families the mux will need.
+		const fontJobs: Promise<void>[] = [];
+		const requestedFontFiles = new Set<string>();
+		let fontDownloadError: { error: unknown } | undefined;
+		const scheduleSubtitleFonts = (usedFonts?: Font[]) => {
+			if (options.skipmux || !usedFonts?.length) return;
+			const requiredFontFiles = [...new Set(usedFonts.flatMap((font) => fontsData.fontFamilies[font] ?? []))].filter((fontFile) => !requestedFontFiles.has(fontFile));
+			for (const fontFile of requiredFontFiles) requestedFontFiles.add(fontFile);
+			if (!requiredFontFiles.length) return;
+			fontJobs.push(
+				this.getFonts(requiredFontFiles).catch((error) => {
+					fontDownloadError ??= { error };
+				})
+			);
+		};
 
 		if (medias.data.every((a) => !a.playback)) {
 			console.warn('Video not available!');
@@ -1716,7 +1745,7 @@ export default class Crunchy implements ServiceClass {
 
 				//Make sure token is up-to-date
 				await this.refreshToken(true, true);
-				let currentVersion;
+				let currentVersion: EpisodeVersion | undefined;
 				let isPrimary = mMeta.isSubbed;
 				const AuthHeaders: FetchParams = {
 					headers: {
@@ -2275,8 +2304,10 @@ export default class Crunchy implements ServiceClass {
 				}
 
 				if (!dlFailed && vcurStream && acurStream && vcurStream !== undefined && acurStream !== undefined && !(options.novids && options.noaudio)) {
-					const vstreamPlaylistsReq = await this.req.getData(vcurStream.url, AuthHeaders);
-					const astreamPlaylistsReq = vcurStream.url !== acurStream.url ? await this.req.getData(acurStream.url, AuthHeaders) : vstreamPlaylistsReq;
+					// The independent video/audio manifests can be fetched together.
+					const vstreamPlaylistsReqPromise = this.req.getData(vcurStream.url, AuthHeaders);
+					const astreamPlaylistsReqPromise = vcurStream.url !== acurStream.url ? this.req.getData(acurStream.url, AuthHeaders) : vstreamPlaylistsReqPromise;
+					const [vstreamPlaylistsReq, astreamPlaylistsReq] = await Promise.all([vstreamPlaylistsReqPromise, astreamPlaylistsReqPromise]);
 					if (!vstreamPlaylistsReq.ok || !vstreamPlaylistsReq.res || !astreamPlaylistsReq.ok || !astreamPlaylistsReq.res) {
 						console.error("CAN'T FETCH VIDEO PLAYLISTS!");
 						dlFailed = true;
@@ -2446,97 +2477,60 @@ export default class Crunchy implements ServiceClass {
 							let encryptionKeysVideo: { kid: string; key: string }[] | undefined;
 							let encryptionKeysAudio: { kid: string; key: string }[] | undefined;
 
-							//Handle Getting Decryption Keys if needed
+							// Fetch independent keep-alives and track keys concurrently before transfer.
 							if (chosenVideoSegments.pssh_wvd || chosenVideoSegments.pssh_prd || chosenAudioSegments.pssh_wvd || chosenAudioSegments.pssh_prd) {
 								await this.refreshToken(true, true);
+								const keepAliveRequests: Promise<reqModule.GetDataResponse>[] = [];
 								if (videoStream) {
-									await this.req.getData(
-										`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${videoStream.token}/keepAlive?playhead=1`,
-										{ ...{ method: 'PATCH' }, ...AuthHeaders }
+									keepAliveRequests.push(
+										this.req.getData(
+											`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${videoStream.token}/keepAlive?playhead=1`,
+											{ ...{ method: 'PATCH' }, ...AuthHeaders }
+										)
 									);
 								}
 								if (audioStream && videoStream?.token !== audioStream.token) {
-									await this.req.getData(
-										`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${audioStream.token}/keepAlive?playhead=1`,
-										{ ...{ method: 'PATCH' }, ...AuthHeaders }
+									keepAliveRequests.push(
+										this.req.getData(
+											`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${audioStream.token}/keepAlive?playhead=1`,
+											{ ...{ method: 'PATCH' }, ...AuthHeaders }
+										)
 									);
 								}
 
 								console.info(`Getting decryption keys with ${cdm}`);
-								// New Crunchyroll DRM endpoint for Widevine
-								if (cdm === 'widevine') {
-									encryptionKeysVideo = await getKeysWVD(
-										audioOnly ? chosenAudioSegments.pssh_wvd : chosenVideoSegments.pssh_wvd,
-										api.drm_widevine,
-										{
-											Authorization: `Bearer ${this.token.access_token}`,
-											...api.crunchyDefHeader,
-											Pragma: 'no-cache',
-											'Cache-Control': 'no-cache',
-											'content-type': 'application/octet-stream',
-											'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
-											'x-cr-video-token': audioOnly ? (audioStream ?? videoStream)!.token : videoStream!.token
-										},
-										'crunchyroll'
-									);
+								const drmHeaders = (videoToken: string): Record<string, string> => ({
+									Authorization: `Bearer ${this.token.access_token}`,
+									...api.crunchyDefHeader,
+									Pragma: 'no-cache',
+									'Cache-Control': 'no-cache',
+									'content-type': 'application/octet-stream',
+									'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
+									'x-cr-video-token': videoToken
+								});
 
-									// Check if the audio pssh is different since Crunchyroll started to have different dec keys for audio tracks
-									if (!audioOnly && chosenAudioSegments.pssh_wvd && chosenAudioSegments.pssh_wvd !== chosenVideoSegments.pssh_wvd) {
-										encryptionKeysAudio = await getKeysWVD(
-											chosenAudioSegments.pssh_wvd,
-											api.drm_widevine,
-											{
-												Authorization: `Bearer ${this.token.access_token}`,
-												...api.crunchyDefHeader,
-												Pragma: 'no-cache',
-												'Cache-Control': 'no-cache',
-												'content-type': 'application/octet-stream',
-												'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
-												'x-cr-video-token': audioStream!.token
-											},
-											'crunchyroll'
-										);
-									} else {
-										encryptionKeysAudio = encryptionKeysVideo;
-									}
+								if (cdm === 'widevine') {
+									const videoPssh = audioOnly ? chosenAudioSegments.pssh_wvd : chosenVideoSegments.pssh_wvd;
+									const videoToken = audioOnly ? (audioStream ?? videoStream)!.token : videoStream!.token;
+									const videoKeysPromise = getKeysWVD(videoPssh, api.drm_widevine, drmHeaders(videoToken), 'crunchyroll');
+									const separateAudioKeys = !audioOnly && Boolean(chosenAudioSegments.pssh_wvd) && chosenAudioSegments.pssh_wvd !== chosenVideoSegments.pssh_wvd;
+									const audioKeysPromise = separateAudioKeys
+										? getKeysWVD(chosenAudioSegments.pssh_wvd, api.drm_widevine, drmHeaders((audioStream ?? videoStream)!.token), 'crunchyroll')
+										: videoKeysPromise;
+									const [keys] = await Promise.all([Promise.all([videoKeysPromise, audioKeysPromise]), Promise.all(keepAliveRequests)]);
+									[encryptionKeysVideo, encryptionKeysAudio] = keys;
 								}
 
-								// New Crunchyroll DRM endpoint for Playready
 								if (cdm === 'playready') {
-									encryptionKeysVideo = await getKeysPRD(
-										audioOnly ? chosenAudioSegments.pssh_prd : chosenVideoSegments.pssh_prd,
-										api.drm_playready,
-										{
-											Authorization: `Bearer ${this.token.access_token}`,
-											...api.crunchyDefHeader,
-											Pragma: 'no-cache',
-											'Cache-Control': 'no-cache',
-											'content-type': 'application/octet-stream',
-											'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
-											'x-cr-video-token': audioOnly ? (audioStream ?? videoStream)!.token : videoStream!.token
-										},
-										'crunchyroll'
-									);
-
-									// Check if the audio pssh is different since Crunchyroll started to have different dec keys for audio tracks
-									if (!audioOnly && chosenAudioSegments.pssh_prd && chosenAudioSegments.pssh_prd !== chosenVideoSegments.pssh_prd) {
-										encryptionKeysAudio = await getKeysPRD(
-											chosenAudioSegments.pssh_prd,
-											api.drm_playready,
-											{
-												Authorization: `Bearer ${this.token.access_token}`,
-												...api.crunchyDefHeader,
-												Pragma: 'no-cache',
-												'Cache-Control': 'no-cache',
-												'content-type': 'application/octet-stream',
-												'x-cr-content-id': currentVersion ? currentVersion.guid : currentMediaId,
-												'x-cr-video-token': audioStream!.token
-											},
-											'crunchyroll'
-										);
-									} else {
-										encryptionKeysAudio = encryptionKeysVideo;
-									}
+									const videoPssh = audioOnly ? chosenAudioSegments.pssh_prd : chosenVideoSegments.pssh_prd;
+									const videoToken = audioOnly ? (audioStream ?? videoStream)!.token : videoStream!.token;
+									const videoKeysPromise = getKeysPRD(videoPssh, api.drm_playready, drmHeaders(videoToken), 'crunchyroll');
+									const separateAudioKeys = !audioOnly && Boolean(chosenAudioSegments.pssh_prd) && chosenAudioSegments.pssh_prd !== chosenVideoSegments.pssh_prd;
+									const audioKeysPromise = separateAudioKeys
+										? getKeysPRD(chosenAudioSegments.pssh_prd, api.drm_playready, drmHeaders((audioStream ?? videoStream)!.token), 'crunchyroll')
+										: videoKeysPromise;
+									const [keys] = await Promise.all([Promise.all([videoKeysPromise, audioKeysPromise]), Promise.all(keepAliveRequests)]);
+									[encryptionKeysVideo, encryptionKeysAudio] = keys;
 								}
 
 								if (!encryptionKeysVideo || encryptionKeysVideo.length == 0 || !encryptionKeysAudio || encryptionKeysAudio.length == 0) {
@@ -2547,25 +2541,7 @@ export default class Crunchy implements ServiceClass {
 								console.debug('Got decryption keys');
 							}
 
-							if (videoStream) {
-								await this.refreshToken(true, true);
-								await this.req.getData(
-									`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${videoStream.token}`,
-									{
-										...{ method: 'DELETE' },
-										...AuthHeaders
-									}
-								);
-							}
-							if (audioStream && videoStream?.token !== audioStream.token) {
-								await this.req.getData(
-									`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${audioStream.token}`,
-									{
-										...{ method: 'DELETE' },
-										...AuthHeaders
-									}
-								);
-							}
+							await this.endPlaybackSessions(currentVersion ? currentVersion.guid : currentMediaId, videoStream, audioStream);
 
 							// Finalize each track independently; a sibling failure must not prevent decryption.
 							// The decrypt itself goes on the tail queue: it runs while the next episode
@@ -2872,20 +2848,7 @@ export default class Crunchy implements ServiceClass {
 									dlFailed = true;
 								} else {
 									// We have the stream, so go ahead and delete the active stream
-									if (videoStream) {
-										await this.refreshToken(true, true);
-										await this.req.getData(
-											`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${videoStream.token}`,
-											{ ...{ method: 'DELETE' }, ...AuthHeaders }
-										);
-									}
-									if (audioStream && videoStream?.token !== audioStream.token) {
-										await this.req.getData(
-											`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${currentVersion ? currentVersion.guid : currentMediaId}/${audioStream.token}`,
-											{ ...{ method: 'DELETE' }, ...AuthHeaders }
-										);
-									}
-
+									await this.endPlaybackSessions(currentVersion ? currentVersion.guid : currentMediaId, videoStream, audioStream);
 									const chunkPageBody = await chunkPage.res.text();
 									// Init parser
 									const parser = new Parser();
@@ -3313,6 +3276,7 @@ export default class Crunchy implements ServiceClass {
 										sxData.title = langItem.language;
 										sxData.fonts = fontsData.assFonts(sBody) as Font[];
 									}
+									if (sxData.fonts?.length) scheduleSubtitleFonts(sxData.fonts);
 									fs.writeFileSync(sxData.path, sBody);
 									addTrack({
 										key: `sub-${sxData.file}`,
@@ -3382,10 +3346,17 @@ export default class Crunchy implements ServiceClass {
 			finalOutBase = path.join(targetDir, finalNamePart);
 		}
 
+		const fontsReady = Promise.all(fontJobs).then(() => {
+			if (fontDownloadError) throw fontDownloadError.error;
+		});
+		// The downloads may reject well before the tail queue reaches muxing. Attach a
+		// handler now, while preserving the rejection for the queued mux task to report.
+		void fontsReady.catch(() => undefined);
 		return {
 			error: dlFailed,
 			data: files,
-			fileName: finalOutBase
+			fileName: finalOutBase,
+			fontsReady
 		};
 	}
 

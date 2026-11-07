@@ -188,6 +188,10 @@ function testCrunchyWiring() {
 		'the queued decrypt must hand off to decryptTrack with its owning view'
 	);
 	assert.ok(source.includes('this.tailQueue.enqueue(`mux ${path.basename'), 'the mux must be queued behind its own decrypts');
+	assert.ok(source.includes('scheduleSubtitleFonts(sxData.fonts)'), 'required fonts must start downloading as soon as subtitle font requirements are known');
+	assert.ok(source.includes('this.getFonts(requiredFontFiles).catch'), 'font downloads must be tracked without unhandled background rejections');
+	assert.ok(source.includes('const fontsReady = Promise.all(fontJobs)'), 'the queued mux must have a completion promise for its font preparation');
+	assert.ok(source.includes('await res.fontsReady;'), 'muxing must wait for early font preparation before its fallback font check');
 	assert.ok(!source.includes('await this.muxStreams(res.data'), 'the episode loop must not wait for the mux of the previous episode');
 	assert.ok(source.includes('await this.drainTail();'), 'cli() must drain the tail queue before the run is over');
 	assert.ok(source.includes('this.tailQueue.enqueue(`archive '), 'the archive mark must wait for the episode tail');
@@ -196,6 +200,17 @@ function testCrunchyWiring() {
 		'an episode whose track failed after download must not be archived'
 	);
 	assert.ok(source.includes('await Promise.all(videoJobs);'), 'video jobs must drain before returning');
+	assert.ok(
+		source.includes('const [vstreamPlaylistsReq, astreamPlaylistsReq] = await Promise.all([vstreamPlaylistsReqPromise, astreamPlaylistsReqPromise]);'),
+		'independent video/audio manifests must be fetched concurrently'
+	);
+	assert.ok(source.includes('Promise.all(keepAliveRequests)'), 'independent playback keep-alives must not serialize');
+	assert.ok(
+		source.includes('const [keys] = await Promise.all([Promise.all([videoKeysPromise, audioKeysPromise]), Promise.all(keepAliveRequests)]);'),
+		'independent key and keep-alive requests must overlap'
+	);
+	assert.ok(source.includes('[encryptionKeysVideo, encryptionKeysAudio] = keys;'), 'both key results must be retained');
+	assert.ok(source.includes('await Promise.all(tokens.map((token) => this.req.getData('), 'independent playback sessions must be closed concurrently');
 	assert.ok(source.includes('await Helper.decrypt(binary, args);'), 'decryption must not block network transfers');
 	assert.ok(
 		source.includes('applyActualAudioTag(variables, files, options.fileName)'),
